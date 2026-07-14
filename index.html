@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinSpark - Smart Money for Teens</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --vercel-black: #000000;
+            --vercel-white: #ffffff;
+            --vercel-gray-50: #fafafa;
+            --vercel-gray-100: #f4f4f5;
+            --vercel-gray-200: #e4e4e7;
+            --vercel-gray-300: #d4d4d8;
+            --vercel-gray-400: #a1a1aa;
+            --vercel-gray-500: #71717a;
+            --vercel-gray-600: #52525b;
+            --vercel-gray-700: #3f3f46;
+            --vercel-gray-800: #27272a;
+            --vercel-gray-900: #18181b;
+            --vercel-accent: #0070f3;
+            --vercel-border: #e4e4e7;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: var(--vercel-white);
+            color: var(--vercel-gray-900);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .vercel-card {
+            background: var(--vercel-white);
+            border: 1px solid var(--vercel-border);
+            border-radius: 8px;
+            transition: all 0.15s ease;
+        }
+        
+        .vercel-card:hover {
+            border-color: var(--vercel-gray-300);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+        
+        .vercel-input {
+            background: var(--vercel-white);
+            border: 1px solid var(--vercel-gray-300);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 14px;
+            transition: all 0.15s ease;
+            width: 100%;
+        }
+        
+        .vercel-input:focus {
+            outline: none;
+            border-color: var(--vercel-accent);
+            box-shadow: 0 0 0 3px rgb(0 112 243 / 0.1);
+        }
+        
+        .vercel-btn {
+            background: var(--vercel-black);
+            color: var(--vercel-white);
+            border: 1px solid var(--vercel-gray-200);
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.15s ease;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .vercel-btn:hover {
+            background: var(--vercel-gray-100);
+            border-color: var(--vercel-gray-300);
+        }
+        
+        .vercel-btn-primary {
+            background: var(--vercel-black);
+            color: var(--vercel-white);
+            border: 1px solid var(--vercel-black);
+        }
+        
+        .vercel-btn-primary:hover {
+            background: var(--vercel-gray-800);
+            border-color: var(--vercel-gray-800);
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div class="min-h-screen flex">
+        <!-- Left Side - Branding -->
+        <div class="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-black to-gray-800 p-12 flex-col justify-center">
+            <div class="max-w-md">
+                <div class="flex items-center gap-4 mb-8">
+                    <div class="w-16 h-16 bg-white rounded-xl flex items-center justify-center">
+                        <i class="fas fa-wallet text-black text-2xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-4xl font-bold text-white">FinSpark</h1>
+                        <p class="text-gray-400">Smart Money for Teens</p>
+                    </div>
+                </div>
+                
+                <h2 class="text-3xl font-bold text-white mb-6">Take control of your money</h2>
+                <p class="text-gray-300 text-lg mb-8">
+                    Track spending, set savings goals, and build smart money habits that will last a lifetime. Designed specifically for teens like you.
+                </p>
+                
+                <div class="space-y-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-chart-line text-white"></i>
+                        </div>
+                        <span class="text-white">Track your spending in real-time</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-piggy-bank text-white"></i>
+                        </div>
+                        <span class="text-white">Set and achieve savings goals</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-shield-alt text-white"></i>
+                        </div>
+                        <span class="text-white">Your data stays private and secure</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right Side - Auth Forms -->
+        <div class="w-full lg:w-1/2 flex items-center justify-center p-8">
+            <div class="w-full max-w-md">
+                <!-- Mobile Logo -->
+                <div class="lg:hidden flex items-center gap-3 mb-8 justify-center">
+                    <div class="w-12 h-12 bg-black rounded-xl flex items-center justify-center">
+                        <i class="fas fa-wallet text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900">FinSpark</h1>
+                        <p class="text-sm text-gray-600">Smart Money for Teens</p>
+                    </div>
+                </div>
+                
+                <!-- Auth Card -->
+                <div class="vercel-card p-8 animate-fade-in">
+                    <!-- Tab Switcher -->
+                    <div class="flex mb-8 border-b border-gray-200">
+                        <button onclick="showLogin()" id="loginTab" class="flex-1 pb-4 text-sm font-medium border-b-2 border-black text-black">
+                            Log In
+                        </button>
+                        <button onclick="showSignup()" id="signupTab" class="flex-1 pb-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                            Sign Up
+                        </button>
+                    </div>
+                    
+                    <!-- Login Form -->
+                    <div id="loginForm">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-2">Welcome back</h2>
+                        <p class="text-gray-600 mb-6">Log in to your FinSpark account</p>
+                        
+                        <form onsubmit="handleLogin(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                                <input type="email" id="loginEmail" class="vercel-input" placeholder="your@email.com" required>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                                <input type="password" id="loginPassword" class="vercel-input" placeholder="••••••••" required>
+                            </div>
+                            
+                            <div class="flex items-center justify-between">
+                                <label class="flex items-center gap-2 text-sm text-gray-600">
+                                    <input type="checkbox" id="rememberMe">
+                                    Remember me
+                                </label>
+                                <a href="#" class="text-sm text-blue-600 hover:underline">Forgot password?</a>
+                            </div>
+                            
+                            <button type="submit" class="vercel-btn vercel-btn-primary w-full py-3 text-base">
+                                Log In <i class="fas fa-arrow-right ml-2"></i>
+                            </button>
+                        </form>
+                        
+                        <div id="loginError" class="hidden mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                            Invalid email or password
+                        </div>
+                    </div>
+                    
+                    <!-- Signup Form -->
+                    <div id="signupForm" class="hidden">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-2">Create your account</h2>
+                        <p class="text-gray-600 mb-6">Start your financial journey today</p>
+                        
+                        <form onsubmit="handleSignup(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                                <input type="text" id="signupName" class="vercel-input" placeholder="John Doe" required>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                                <input type="email" id="signupEmail" class="vercel-input" placeholder="your@email.com" required>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                                <input type="password" id="signupPassword" class="vercel-input" placeholder="••••••••" required minlength="8">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Grade in School</label>
+                                <select id="signupGrade" class="vercel-input" required>
+                                    <option value="">Select your grade</option>
+                                    <option value="6">6th Grade</option>
+                                    <option value="7">7th Grade</option>
+                                    <option value="8">8th Grade</option>
+                                    <option value="9">9th Grade (Freshman)</option>
+                                    <option value="10">10th Grade (Sophomore)</option>
+                                    <option value="11">11th Grade (Junior)</option>
+                                    <option value="12">12th Grade (Senior)</option>
+                                    <option value="college">College/University</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Monthly Allowance ($)</label>
+                                <input type="number" id="signupAllowance" class="vercel-input" placeholder="e.g., 100" required>
+                            </div>
+                            
+                            <div>
+                                <label class="flex items-center gap-2 text-sm text-gray-600">
+                                    <input type="checkbox" id="agreeTerms" required>
+                                    I agree to the Terms of Service and Privacy Policy
+                                </label>
+                            </div>
+                            
+                            <button type="submit" class="vercel-btn vercel-btn-primary w-full py-3 text-base">
+                                Create Account <i class="fas fa-rocket ml-2"></i>
+                            </button>
+                        </form>
+                        
+                        <div id="signupError" class="hidden mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                            Email already exists
+                        </div>
+                    </div>
+                </div>
+                
+                <p class="text-center mt-6 text-gray-600 text-sm">
+                    By continuing, you agree to FinSpark's Terms of Service and Privacy Policy
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // User storage (simulated database)
+        const getUsers = () => {
+            const users = localStorage.getItem('finspark_users');
+            return users ? JSON.parse(users) : {};
+        };
+        
+        const saveUsers = (users) => {
+            localStorage.setItem('finspark_users', JSON.stringify(users));
+        };
+        
+        // Tab switching
+        function showLogin() {
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('signupForm').classList.add('hidden');
+            document.getElementById('loginTab').classList.add('border-black', 'text-black');
+            document.getElementById('loginTab').classList.remove('border-transparent', 'text-gray-500');
+            document.getElementById('signupTab').classList.remove('border-black', 'text-black');
+            document.getElementById('signupTab').classList.add('border-transparent', 'text-gray-500');
+        }
+        
+        function showSignup() {
+            document.getElementById('signupForm').classList.remove('hidden');
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('signupTab').classList.add('border-black', 'text-black');
+            document.getElementById('signupTab').classList.remove('border-transparent', 'text-gray-500');
+            document.getElementById('loginTab').classList.remove('border-black', 'text-black');
+            document.getElementById('loginTab').classList.add('border-transparent', 'text-gray-500');
+        }
+        
+        // Handle Login
+        function handleLogin(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            const users = getUsers();
+            
+            if (users[email] && users[email].password === password) {
+                // Login successful
+                localStorage.setItem('finspark_authenticated', 'true');
+                localStorage.setItem('finspark_user', JSON.stringify(users[email]));
+                window.location.href = 'dashboard.html';
+            } else {
+                // Login failed
+                document.getElementById('loginError').classList.remove('hidden');
+            }
+        }
+        
+        // Handle Signup
+        function handleSignup(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('signupName').value;
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+            const grade = document.getElementById('signupGrade').value;
+            const allowance = document.getElementById('signupAllowance').value;
+            
+            const users = getUsers();
+            
+            if (users[email]) {
+                // Email already exists
+                document.getElementById('signupError').classList.remove('hidden');
+                return;
+            }
+            
+            // Create new user
+            const newUser = {
+                name,
+                email,
+                password,
+                grade,
+                monthlyAllowance: allowance,
+                allowanceFrequency: 'monthly',
+                primaryGoal: '',
+                targetAmount: 0,
+                currency: 'USD',
+                categories: ['Food', 'Shopping', 'Entertainment'],
+                notifications: true,
+                createdAt: new Date().toISOString()
+            };
+            
+            users[email] = newUser;
+            saveUsers(users);
+            
+            // Auto login after signup
+            localStorage.setItem('finspark_authenticated', 'true');
+            localStorage.setItem('finspark_user', JSON.stringify(newUser));
+            window.location.href = 'dashboard.html';
+        }
+        
+        // Check if already logged in
+        if (localStorage.getItem('finspark_authenticated') === 'true') {
+            window.location.href = 'dashboard.html';
+        }
+    </script>
+</body>
+</html>

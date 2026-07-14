@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinSpark - Smart Money for Teens</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .progress-bar {
+            transition: width 0.3s ease-in-out;
+        }
+        
+        /* Vercel-inspired CSS Variables */
+        :root {
+            --vercel-black: #000000;
+            --vercel-white: #ffffff;
+            --vercel-gray-50: #fafafa;
+            --vercel-gray-100: #f4f4f5;
+            --vercel-gray-200: #e4e4e7;
+            --vercel-gray-300: #d4d4d8;
+            --vercel-gray-400: #a1a1aa;
+            --vercel-gray-500: #71717a;
+            --vercel-gray-600: #52525b;
+            --vercel-gray-700: #3f3f46;
+            --vercel-gray-800: #27272a;
+            --vercel-gray-900: #18181b;
+            --vercel-accent: #0070f3;
+            --vercel-border: #e4e4e7;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        }
+        
+        /* Base styles */
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: var(--vercel-white);
+            color: var(--vercel-gray-900);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* Enhanced Dark mode styles */
+        .dark-mode {
+            background: var(--vercel-black);
+            color: var(--vercel-gray-100);
+        }
+        
+        .dark-mode body {
+            background: var(--vercel-black);
+            color: var(--vercel-gray-100);
+        }
+        
+        .dark-mode .bg-white {
+            background: var(--vercel-gray-900) !important;
+            border-color: var(--vercel-gray-800) !important;
+        }
+        
+        .dark-mode .vercel-card {
+            background: var(--vercel-gray-900) !important;
+            border-color: var(--vercel-gray-800) !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+        }
+        
+        .dark-mode .vercel-card:hover {
+            border-color: var(--vercel-gray-700) !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+        }
+        
+        .dark-mode .text-gray-500,
+        .dark-mode .text-gray-600,
+        .dark-mode .text-gray-700 {
+            color: var(--vercel-gray-400) !important;
+        }
+        
+        .dark-mode .text-gray-800,
+        .dark-mode .text-gray-900 {
+            color: var(--vercel-gray-100) !important;
+        }
+        
+        .dark-mode .border {
+            border-color: var(--vercel-gray-800) !important;
+        }
+        
+        .dark-mode .border-b {
+            border-color: var(--vercel-gray-800) !important;
+        }
+        
+        .dark-mode input,
+        .dark-mode select,
+        .dark-mode textarea {
+            background: var(--vercel-gray-800) !important;
+            color: var(--vercel-gray-100) !important;
+            border-color: var(--vercel-gray-700) !important;
+        }
+        
+        .dark-mode input:focus,
+        .dark-mode select:focus,
+        .dark-mode textarea:focus {
+            border-color: var(--vercel-accent) !important;
+            box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.1) !important;
+        }
+        
+        .dark-mode .hover-glow:hover {
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1) !important;
+        }
+        
+        .dark-mode .bg-blue-50 {
+            background-color: #1e3a8a !important;
+        }
+        
+        .dark-mode .bg-green-50 {
+            background-color: #14532d !important;
+        }
+        
+        .dark-mode .bg-purple-50 {
+            background-color: #581c87 !important;
+        }
+        
+        .dark-mode .bg-yellow-50 {
+            background-color: #713f12 !important;
+        }
+        
+        .dark-mode .text-blue-600 {
+            color: #60a5fa !important;
+        }
+        
+        .dark-mode .text-green-600 {
+            color: #4ade80 !important;
+        }
+        
+        .dark-mode .text-purple-600 {
+            color: #c084fc !important;
+        }
+        
+        .dark-mode .text-yellow-600 {
+            color: #facc15 !important;
+        }
+        
+        .dark-mode .bg-gray-100 {
+            background-color: var(--vercel-gray-800) !important;
+        }
+        
+        .dark-mode .bg-gray-200 {
+            background-color: var(--vercel-gray-700) !important;
+        }
+        
+        /* Vercel-style animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        .animate-fade-in {
+            animation: fadeInUp 0.4s ease-out;
+        }
+        
+        .animate-slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        .animate-scale-in {
+            animation: scaleIn 0.3s ease-out;
+        }
+        
+        /* Enhanced animations */
+        @keyframes bounce {
+            0%, 20%, 53%, 80%, 100% {
+                transform: translateY(0);
+            }
+            40%, 43% {
+                transform: translateY(-8px);
+            }
+            70% {
+                transform: translateY(-4px);
+            }
+            90% {
+                transform: translateY(-2px);
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+        
+        @keyframes shimmer {
+            0% {
+                background-position: -200px 0;
+            }
+            100% {
+                background-position: calc(200px + 100%) 0;
+            }
+        }
+        
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+        
+        .animate-bounce {
+            animation: bounce 1s infinite;
+        }
+        
+        .animate-pulse-once {
+            animation: pulse 0.3s ease-in-out;
+        }
+        
+        .animate-shimmer {
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            background-size: 200px 100%;
+            animation: shimmer 2s infinite;
+        }
+        
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        /* Enhanced hover effects */
+        .hover-glow:hover {
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .dark-mode .hover-glow:hover {
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+        
+        .hover-scale:hover {
+            transform: scale(1.02);
+        }
+        
+        .hover-rotate:hover {
+            transform: rotate(5deg);
+        }
+        
+        /* Loading states */
+        .loading {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .loading::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 1.5s infinite;
+        }
+        
+        /* Success animations */
+        .success-animation {
+            animation: successPulse 0.6s ease-in-out;
+        }
+        
+        @keyframes successPulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+            }
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+            }
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+            }
+        }
+        
+        /* Vercel-style cards */
+        .vercel-card {
+            background: var(--vercel-white);
+            border: 1px solid var(--vercel-border);
+            border-radius: 8px;
+            transition: all 0.15s ease;
+        }
+        
+        .vercel-card:hover {
+            border-color: var(--vercel-gray-300);
+            box-shadow: var(--shadow-md);
+        }
+        
+        .dark-mode .vercel-card {
+            background: var(--vercel-gray-900);
+            border-color: var(--vercel-gray-800);
+        }
+        
+        .dark-mode .vercel-card:hover {
+            border-color: var(--vercel-gray-700);
+        }
+        
+        /* Vercel-style buttons */
+        .vercel-btn {
+            background: var(--vercel-black);
+            color: var(--vercel-white);
+            border: 1px solid var(--vercel-gray-200);
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.15s ease;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .vercel-btn:hover {
+            background: var(--vercel-gray-100);
+            border-color: var(--vercel-gray-300);
+        }
+        
+        .vercel-btn-primary {
+            background: var(--vercel-black);
+            color: var(--vercel-white);
+            border: 1px solid var(--vercel-black);
+        }
+        
+        .vercel-btn-primary:hover {
+            background: var(--vercel-gray-800);
+            border-color: var(--vercel-gray-800);
+        }
+        
+        .dark-mode .vercel-btn {
+            background: var(--vercel-white);
+            color: var(--vercel-black);
+            border-color: var(--vercel-gray-700);
+        }
+        
+        .dark-mode .vercel-btn:hover {
+            background: var(--vercel-gray-100);
+            border-color: var(--vercel-gray-600);
+        }
+        
+        .dark-mode .vercel-btn-primary {
+            background: var(--vercel-white);
+            color: var(--vercel-black);
+            border-color: var(--vercel-white);
+        }
+        
+        .dark-mode .vercel-btn-primary:hover {
+            background: var(--vercel-gray-100);
+            border-color: var(--vercel-gray-100);
+        }
+        
+        /* Vercel-style inputs */
+        .vercel-input {
+            background: var(--vercel-white);
+            border: 1px solid var(--vercel-gray-300);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 14px;
+            transition: all 0.15s ease;
+            width: 100%;
+        }
+        
+        .vercel-input:focus {
+            outline: none;
+            border-color: var(--vercel-accent);
+            box-shadow: 0 0 0 3px rgb(0 112 243 / 0.1);
+        }
+        
+        .dark-mode .vercel-input {
+            background: var(--vercel-gray-800);
+            border-color: var(--vercel-gray-700);
+            color: var(--vercel-gray-100);
+        }
+        
+        .dark-mode .vercel-input:focus {
+            border-color: var(--vercel-accent);
+            box-shadow: 0 0 0 3px rgb(0 112 243 / 0.2);
+        }
+        
+        /* Vercel-style tabs */
+        .vercel-tab {
+            background: none;
+            border: none;
+            color: var(--vercel-gray-600);
+            font-size: 14px;
+            font-weight: 500;
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .vercel-tab:hover {
+            color: var(--vercel-gray-900);
+        }
+        
+        .vercel-tab.active {
+            color: var(--vercel-black);
+            border-bottom-color: var(--vercel-black);
+        }
+        
+        .dark-mode .vercel-tab {
+            color: var(--vercel-gray-400);
+        }
+        
+        .dark-mode .vercel-tab:hover {
+            color: var(--vercel-gray-200);
+        }
+        
+        .dark-mode .vercel-tab.active {
+            color: var(--vercel-white);
+            border-bottom-color: var(--vercel-white);
+        }
+        
+        /* Hover effects */
+        .hover-lift {
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        
+        .hover-lift:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        /* Theme toggle */
+        .theme-toggle {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 1000;
+            background: var(--vercel-white);
+            border: 1px solid var(--vercel-gray-200);
+            border-radius: 8px;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .theme-toggle:hover {
+            border-color: var(--vercel-gray-300);
+            box-shadow: var(--shadow-md);
+        }
+        
+        .dark-mode .theme-toggle {
+            background: var(--vercel-gray-900);
+            border-color: var(--vercel-gray-700);
+        }
+        
+        .dark-mode .theme-toggle:hover {
+            border-color: var(--vercel-gray-600);
+        }
+        
+        /* Loading animation */
+        .loading-spinner {
+            border: 2px solid var(--vercel-gray-200);
+            border-top: 2px solid var(--vercel-gray-600);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--vercel-gray-50);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--vercel-gray-300);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--vercel-gray-400);
+        }
+        
+        .dark-mode ::-webkit-scrollbar-track {
+            background: var(--vercel-gray-900);
+        }
+        
+        .dark-mode ::-webkit-scrollbar-thumb {
+            background: var(--vercel-gray-700);
+        }
+        
+        .dark-mode ::-webkit-scrollbar-thumb:hover {
+            background: var(--vercel-gray-600);
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .theme-toggle {
+                top: 16px;
+                right: 16px;
+                width: 40px;
+                height: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Dark Mode Toggle -->
+    <button onclick="toggleDarkMode()" class="theme-toggle" aria-label="Toggle dark mode">
+        <i class="fas fa-moon" id="theme-icon-header"></i>
+    </button>
+
+    <!-- Header -->
+    <header class="animate-fade-in">
+        <div class="max-w-7xl mx-auto px-6 py-8">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="w-12 h-12 bg-gradient-to-br from-black to-gray-800 dark:from-white dark:to-gray-200 rounded-xl flex items-center justify-center shadow-lg">
+                        <i class="fas fa-wallet text-white dark:text-black text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">FinSpark</h1>
+                        <p class="text-sm text-gray-600 dark:text-gray-400" id="userGreeting">Master your finances, build your future</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right hidden md:block">
+                        <div id="currentDate-header" class="text-sm text-gray-600 dark:text-gray-400 font-medium"></div>
+                        <div id="userGrade-display" class="text-xs text-gray-500 dark:text-gray-500"></div>
+                    </div>
+                    <button onclick="logout()" class="vercel-btn p-2 hover:bg-gray-100 dark:hover:bg-gray-800" title="Logout">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        <!-- Navigation Tabs -->
+        <div class="vercel-card mb-8 animate-scale-in">
+            <div class="flex items-center justify-between p-4 border-b border-gray-200">
+                <div class="text-right">
+                    <div id="currentTime" class="text-lg font-semibold text-gray-900 hover:text-gray-700 transition-colors cursor-pointer" onclick="toggleTimeFormat()"></div>
+                    <div id="currentDate" class="text-sm text-gray-600 hover:text-gray-700 transition-colors cursor-pointer" onclick="toggleDateFormat()"></div>
+                </div>
+                <button onclick="toggleDarkMode()" class="vercel-btn p-2">
+                    <i id="theme-icon" class="fas fa-moon"></i>
+                </button>
+            </div>
+            <div class="flex space-x-8 px-6">
+                <button class="vercel-tab active" data-tab="dashboard">
+                    <i class="fas fa-chart-line mr-2"></i>Dashboard
+                </button>
+                <button class="vercel-tab" data-tab="expenses">
+                    <i class="fas fa-shopping-cart mr-2"></i>Spending
+                </button>
+                <button class="vercel-tab" data-tab="budget">
+                    <i class="fas fa-wallet mr-2"></i>Allowance
+                </button>
+                <button class="vercel-tab" data-tab="goals">
+                    <i class="fas fa-gift mr-2"></i>Savings Goals
+                </button>
+                <button class="vercel-tab" data-tab="profile">
+                    <i class="fas fa-user mr-2"></i>Profile
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="vercel-card p-6 hover-lift animate-fade-in hover-glow">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600 mb-1 flex items-center">
+                                Total Balance
+                                <i class="fas fa-edit text-xs ml-2 text-gray-400 hover:text-gray-600 cursor-pointer" onclick="editValue('totalBalance', 'Total Balance')"></i>
+                            </p>
+                            <p id="totalBalance" class="text-2xl font-bold text-gray-900 cursor-pointer hover:text-gray-700 transition-colors" onclick="editValue('totalBalance', 'Total Balance')">$0.00</p>
+                        </div>
+                        <div class="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-piggy-bank text-blue-600 text-lg"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="vercel-card p-6 hover-lift animate-fade-in hover-glow" style="animation-delay: 0.1s">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600 mb-1 flex items-center">
+                                Monthly Income
+                                <i class="fas fa-edit text-xs ml-2 text-gray-400 hover:text-gray-600 cursor-pointer" onclick="editValue('monthlyIncome', 'Monthly Income')"></i>
+                            </p>
+                            <p id="monthlyIncome" class="text-2xl font-bold text-gray-900 cursor-pointer hover:text-gray-700 transition-colors" onclick="editValue('monthlyIncome', 'Monthly Income')">$0.00</p>
+                        </div>
+                        <div class="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-dollar-sign text-green-600 text-lg"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="vercel-card p-6 hover-lift animate-fade-in hover-glow" style="animation-delay: 0.2s">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600 mb-1">Monthly Expenses</p>
+                            <p id="monthlyExpenses" class="text-2xl font-bold text-gray-900">$0.00</p>
+                        </div>
+                        <div class="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-shopping-cart text-purple-600 text-lg"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Savings Rate Card -->
+            <div class="vercel-card p-6 hover-lift animate-fade-in hover-glow" style="animation-delay: 0.3s">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-600 mb-1">Money Saved</p>
+                        <p class="text-2xl font-bold text-gray-900" id="savingsRate">0%</p>
+                    </div>
+                    <div class="w-12 h-12 bg-yellow-50 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-percentage text-yellow-600 text-lg"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="vercel-card p-6 hover-lift animate-fade-in hover-glow" style="animation-delay: 0.4s">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center text-gray-900">
+                        <i class="fas fa-chart-pie mr-2 text-purple-600"></i>
+                        Spending Breakdown
+                    </h3>
+                    <canvas id="expenseChart"></canvas>
+                    <div id="expenseLegend" class="mt-4 grid grid-cols-2 gap-2 text-sm text-gray-600"></div>
+                </div>
+                <div class="vercel-card p-6 hover-lift animate-fade-in hover-glow" style="animation-delay: 0.5s">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center text-gray-900">
+                        <i class="fas fa-bullseye mr-2 text-green-600"></i>
+                        Savings Goals Progress
+                    </h3>
+                    <canvas id="savingsChart"></canvas>
+                    <div id="savingsLegend" class="mt-4 space-y-2 text-sm text-gray-600"></div>
+                </div>
+            </div>
+
+            <!-- Additional Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="vercel-card p-6 hover-lift animate-fade-in hover-glow" style="animation-delay: 0.6s">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center text-gray-900">
+                        <i class="fas fa-wallet mr-2 text-blue-600"></i>
+                        Allowance Breakdown
+                    </h3>
+                    <canvas id="allowanceChart"></canvas>
+                </div>
+                <div class="vercel-card p-6 hover-lift animate-fade-in hover-glow" style="animation-delay: 0.7s">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center text-gray-900">
+                        <i class="fas fa-shopping-bag mr-2 text-orange-600"></i>
+                        Top Spending Categories
+                    </h3>
+                    <canvas id="topCategoriesChart"></canvas>
+                </div>
+                <div class="vercel-card p-6 hover-lift animate-fade-in hover-glow" style="animation-delay: 0.8s">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center text-gray-900">
+                        <i class="fas fa-calendar-alt mr-2 text-indigo-600"></i>
+                        Monthly Trend
+                    </h3>
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Financial Insights Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="vercel-card p-6 hover-lift animate-fade-in hover-glow" style="animation-delay: 0.9s">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center text-gray-900">
+                        <i class="fas fa-brain mr-2 text-purple-600"></i>
+                        Spending Insights
+                    </h3>
+                    <div id="spendingInsights" class="space-y-3">
+                        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Average Daily Spend</span>
+                            <span id="avgDailySpend" class="text-sm font-bold text-gray-900 dark:text-gray-100">$0.00</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Biggest Expense</span>
+                            <span id="biggestExpense" class="text-sm font-bold text-red-600 dark:text-red-400">$0.00</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Most Frequent Category</span>
+                            <span id="frequentCategory" class="text-sm font-bold text-blue-600 dark:text-blue-400">-</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Days Since Last Expense</span>
+                            <span id="daysSinceLast" class="text-sm font-bold text-gray-900 dark:text-gray-100">0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="vercel-card p-6 hover-lift animate-fade-in hover-glow" style="animation-delay: 1.0s">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center text-gray-900">
+                        <i class="fas fa-piggy-bank mr-2 text-green-600"></i>
+                        Savings Goals
+                    </h3>
+                    <div id="savingsGoals" class="space-y-4">
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Emergency Fund</span>
+                                <span class="text-sm text-gray-600 dark:text-gray-400">$500 / $1000</span>
+                            </div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div class="bg-green-600 h-2 rounded-full" style="width: 50%"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">New Phone</span>
+                                <span class="text-sm text-gray-600 dark:text-gray-400">$200 / $800</span>
+                            </div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div class="bg-blue-600 h-2 rounded-full" style="width: 25%"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Gaming Console</span>
+                                <span class="text-sm text-gray-600 dark:text-gray-400">$150 / $500</span>
+                            </div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div class="bg-purple-600 h-2 rounded-full" style="width: 30%"></div>
+                            </div>
+                        </div>
+                        <button onclick="addNewGoal()" class="w-full mt-4 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium">
+                            <i class="fas fa-plus mr-2"></i>Add New Goal
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Financial Health Score -->
+            <div class="vercel-card p-6 hover-lift animate-fade-in hover-glow mb-8" style="animation-delay: 1.1s">
+                <h3 class="text-lg font-semibold mb-4 flex items-center text-gray-900">
+                    <i class="fas fa-heartbeat mr-2 text-red-600"></i>
+                    Financial Health Score
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="text-center">
+                        <div class="relative inline-flex items-center justify-center">
+                            <svg class="w-32 h-32 transform -rotate-90">
+                                <circle cx="64" cy="64" r="56" stroke="currentColor" stroke-width="8" fill="none" class="text-gray-200 dark:text-gray-700"></circle>
+                                <circle cx="64" cy="64" r="56" stroke="currentColor" stroke-width="8" fill="none" 
+                                        class="text-green-500" stroke-dasharray="351.86" stroke-dashoffset="88" stroke-linecap="round"></circle>
+                            </svg>
+                            <div class="absolute">
+                                <span id="healthScore" class="text-3xl font-bold text-gray-900 dark:text-gray-100">75</span>
+                                <span class="text-sm text-gray-600 dark:text-gray-400 block">Good</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600 dark:text-gray-400">Budget Adherence</span>
+                            <span class="text-sm font-medium text-green-600">85%</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600 dark:text-gray-400">Savings Rate</span>
+                            <span class="text-sm font-medium text-blue-600">20%</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600 dark:text-gray-400">Spending Consistency</span>
+                            <span class="text-sm font-medium text-purple-600">72%</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600 dark:text-gray-400">Goal Progress</span>
+                            <span class="text-sm font-medium text-yellow-600">60%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Expenses Tab -->
+        <div id="expenses" class="tab-content">
+            <div class="vercel-card p-6 mb-6 animate-scale-in">
+                <h3 class="text-lg font-semibold mb-6 text-gray-900 flex items-center">
+                    <i class="fas fa-plus-circle mr-3 text-green-600"></i>
+                    Add What You Spent
+                </h3>
+                <form id="expenseForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <input type="text" id="expenseName" placeholder="What did you buy?" required 
+                           class="vercel-input">
+                    <input type="number" id="expenseAmount" placeholder="How much?" step="0.01" required 
+                           class="vercel-input">
+                    <select id="expenseCategory" class="vercel-input">
+                        <option value="">Choose category</option>
+                        <optgroup label="Food & Drinks">
+                            <option value="Food">🍕 Food & Snacks</option>
+                            <option value="Drinks">🥤 Drinks & Coffee</option>
+                            <option value="Restaurant">🍔 Restaurant</option>
+                        </optgroup>
+                        <optgroup label="Shopping">
+                            <option value="Clothes">👕 Clothes & Shoes</option>
+                            <option value="Electronics">📱 Electronics & Games</option>
+                            <option value="Accessories">⌚ Accessories</option>
+                        </optgroup>
+                        <optgroup label="Entertainment">
+                            <option value="Movies">🎬 Movies & Streaming</option>
+                            <option value="Games">🎮 Games & Apps</option>
+                            <option value="Events">🎪 Events & Concerts</option>
+                        </optgroup>
+                        <optgroup label="Transportation">
+                            <option value="Gas">⛽ Gas</option>
+                            <option value="Transit">🚌 Public Transit</option>
+                            <option value="Uber">🚗 Rideshare</option>
+                        </optgroup>
+                        <optgroup label="Other">
+                            <option value="Gifts">🎁 Gifts</option>
+                            <option value="School">📚 School Supplies</option>
+                            <option value="Health">💊 Health & Personal</option>
+                            <option value="Other">📦 Other</option>
+                        </optgroup>
+                    </select>
+                    <button type="submit" class="vercel-btn-primary">
+                        <i class="fas fa-plus mr-2"></i>Add Expense
+                    </button>
+                </form>
+            </div>
+
+            <div class="vercel-card p-6 animate-scale-in" style="animation-delay: 0.1s">
+                <h3 class="text-lg font-semibold mb-6 text-gray-900 flex items-center">
+                    <i class="fas fa-history mr-3 text-blue-600"></i>
+                    Your Recent Spending
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full table-auto">
+                        <thead>
+                            <tr class="border-b border-gray-200">
+                                <th class="text-left py-3 px-4 text-gray-700 font-semibold text-sm">Date</th>
+                                <th class="text-left py-3 px-4 text-gray-700 font-semibold text-sm">What You Bought</th>
+                                <th class="text-left py-3 px-4 text-gray-700 font-semibold text-sm">Category</th>
+                                <th class="text-right py-3 px-4 text-gray-700 font-semibold text-sm">Cost</th>
+                                <th class="text-center py-3 px-4 text-gray-700 font-semibold text-sm">Delete</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expensesList">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Budget Tab -->
+        <div id="budget" class="tab-content">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h3 class="text-lg font-semibold mb-4">Set Your Spending Limits</h3>
+                <form id="budgetForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <select id="budgetCategory" class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        <option value="">Pick a category</option>
+                        <option value="food">Food & Snacks</option>
+                        <option value="transport">Getting Around</option>
+                        <option value="entertainment">Fun & Games</option>
+                        <option value="shopping">Shopping</option>
+                        <option value="friends">Friends & Gifts</option>
+                        <option value="other">Other Stuff</option>
+                    </select>
+                    <input type="number" id="budgetAmount" placeholder="Your spending limit" step="0.01" class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-save mr-2"></i>Set Limit
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold mb-4">Your Spending Limits</h3>
+                <div id="budgetList" class="space-y-4">
+                </div>
+            </div>
+        </div>
+
+        <!-- Goals Tab -->
+        <div id="goals" class="tab-content">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h3 class="text-lg font-semibold mb-4">What Are You Saving For?</h3>
+                <form id="goalForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <input type="text" id="goalName" placeholder="What are you saving for?" required class="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="number" id="goalTarget" placeholder="Goal amount" step="0.01" required class="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select id="goalCategory" class="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Choose goal type</option>
+                        <optgroup label="Big Purchases">
+                            <option value="Car">🚗 Car</option>
+                            <option value="Phone">📱 New Phone</option>
+                            <option value="Computer">💻 Computer</option>
+                            <option value="Gaming">🎮 Gaming Console</option>
+                        </optgroup>
+                        <optgroup label="Education">
+                            <option value="College">🎓 College Fund</option>
+                            <option value="Course">📚 Online Course</option>
+                            <option value="Books">📖 Books</option>
+                        </optgroup>
+                        <optgroup label="Experiences">
+                            <option value="Travel">✈️ Travel</option>
+                            <option value="Concert">🎪 Concert/Event</option>
+                            <option value="Trip">🏖️ Trip</option>
+                        </optgroup>
+                        <optgroup label="Personal">
+                            <option value="Emergency">🆘 Emergency Fund</option>
+                            <option value="Gifts">🎁 Gifts</option>
+                            <option value="Other">💰 Other Goal</option>
+                        </optgroup>
+                    </select>
+                    <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                        <i class="fas fa-plus mr-2"></i>Add Goal
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold mb-4">Your Savings Goals</h3>
+                <div id="goalsList" class="space-y-4">
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Tab -->
+        <div id="profile" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Personal Information -->
+                <div class="vercel-card p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="fas fa-user mr-2 text-blue-600"></i>
+                        Personal Information
+                    </h3>
+                    <form onsubmit="saveProfile(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                            <input type="text" id="profileName" class="vercel-input" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                            <input type="email" id="profileEmail" class="vercel-input" disabled class="bg-gray-100">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Grade in School</label>
+                            <select id="profileGrade" class="vercel-input" required>
+                                <option value="6">6th Grade</option>
+                                <option value="7">7th Grade</option>
+                                <option value="8">8th Grade</option>
+                                <option value="9">9th Grade (Freshman)</option>
+                                <option value="10">10th Grade (Sophomore)</option>
+                                <option value="11">11th Grade (Junior)</option>
+                                <option value="12">12th Grade (Senior)</option>
+                                <option value="college">College/University</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="vercel-btn vercel-btn-primary w-full py-2">
+                            Save Changes
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Financial Information -->
+                <div class="vercel-card p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="fas fa-wallet mr-2 text-green-600"></i>
+                        Financial Information
+                    </h3>
+                    <form onsubmit="saveFinancialInfo(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Monthly Allowance ($)</label>
+                            <input type="number" id="profileAllowance" class="vercel-input" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Allowance Frequency</label>
+                            <select id="profileFrequency" class="vercel-input" required>
+                                <option value="weekly">Weekly</option>
+                                <option value="biweekly">Every 2 Weeks</option>
+                                <option value="monthly">Monthly</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Do you have a job?</label>
+                            <select id="profileHasJob" class="vercel-input" onchange="toggleJobFields()">
+                                <option value="no">No</option>
+                                <option value="yes">Yes</option>
+                            </select>
+                        </div>
+                        <div id="jobFields" class="hidden space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Job Title</label>
+                                <input type="text" id="profileJobTitle" class="vercel-input" placeholder="e.g., Cashier, Lifeguard">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Hourly Wage ($)</label>
+                                <input type="number" id="profileHourlyWage" class="vercel-input" placeholder="e.g., 15">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Hours per Week</label>
+                                <input type="number" id="profileHoursPerWeek" class="vercel-input" placeholder="e.g., 15">
+                            </div>
+                        </div>
+                        <button type="submit" class="vercel-btn vercel-btn-primary w-full py-2">
+                            Save Changes
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Account Settings -->
+                <div class="vercel-card p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="fas fa-cog mr-2 text-gray-600"></i>
+                        Account Settings
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Change Password</label>
+                            <input type="password" id="newPassword" class="vercel-input" placeholder="New password">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
+                            <input type="password" id="confirmPassword" class="vercel-input" placeholder="Confirm new password">
+                        </div>
+                        <button onclick="changePassword()" class="vercel-btn w-full py-2">
+                            Update Password
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="vercel-card p-6 border-red-200">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center text-red-600">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        Danger Zone
+                    </h3>
+                    <p class="text-gray-600 text-sm mb-4">Once you delete your account, there is no going back. Please be certain.</p>
+                    <button onclick="deleteAccount()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
+                        Delete Account
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Initialize app on load
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>
