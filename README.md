@@ -1,3 +1,54 @@
+# CivicLens — Local development & Vercel deploy
+
+Quick steps to run locally and deploy to Vercel.
+
+Local (development)
+
+1. Copy example env and fill values from your Supabase project:
+
+```bash
+cp .env.example .env.local
+# edit .env.local and set values for NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+```
+
+2. Install and run dev server:
+
+```bash
+pnpm setup
+pnpm dev
+```
+
+Production (local build & serve)
+
+```bash
+pnpm build
+pnpm start
+```
+
+Vercel deployment checklist
+
+- Remove or update any custom `vercel.json` that targets static/Vite builds (this project uses Next.js).
+- Ensure the following env vars are set in the Vercel project settings (do NOT commit secrets):
+  - `NEXT_PUBLIC_SUPABASE_URL` (public)
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (public)
+  - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
+- Confirm `package.json` contains `build` and `dev` scripts (uses `pnpm`).
+- Link the repo to Vercel via the dashboard or `vercel` CLI and trigger a deploy.
+
+Deploy via Vercel CLI (optional):
+
+```bash
+# install vercel CLI if needed
+pnpm add -g vercel
+# from repo root
+vercel login
+vercel --prod
+```
+
+Notes
+
+- Keep `.env.local` out of source control. Use Vercel's Environment Variables UI for production secrets.
+- If you want, I can also run a production build locally to validate the output — let me know.
 # CivicLens MVP
 
 CivicLens is a mobile-first civic decision tracker for Charlotte, Mecklenburg County, and CMS. This MVP uses clearly labeled fictional demonstration data and mocked assistant responses—no claims describe current government activity.
