@@ -13,6 +13,7 @@ function client() {
 }
 
 const text = (value: unknown, fallback = "") => typeof value === "string" ? value : fallback;
+const excerpt=(value:string,max:number)=>value.length<=max?value:`${value.slice(0,max).replace(/\s+\S*$/,"")}…`;
 
 function mapSource(row: Record<string, unknown>): CivicSource {
   return { id:text(row.id), decisionId:text(row.decision_id), title:text(row.title), organization:text(row.organization), url:text(row.url), publishedAt:text(row.published_at) || undefined, pageReference:text(row.page_reference) || undefined, lastVerifiedAt:text(row.last_verified_at), verificationStatus:(text(row.verification_status,"unconfirmed") as CivicSource["verificationStatus"]) };
@@ -31,18 +32,19 @@ function mapDecision(row: Row): Decision {
   };
 }
 
-const selection = "*, sources(*), timeline_events(*)";
+const detailSelection = "*, sources(*), timeline_events(*)";
+const listSelection = "id,slug,title,organization,topic,status,summary,why_it_matters,latest_update,next_step,published_at,updated_at,approved_at,archived_at,last_checked_at,affected_roles,affected_zip_codes,affected_areas,important_dates,before_text,after_text,is_published";
 
 async function localDecisions():Promise<Decision[]>{try{return JSON.parse(await readFile(resolve(process.cwd(),".civiclens/local-decisions.json"),"utf8")) as Decision[]}catch{return[]}}
 
-export async function getDecisions(options: { includeArchived?: boolean; limit?: number } = {}): Promise<Decision[]> {
+export async function getDecisions(options: { includeArchived?: boolean; limit?: number; withRelations?:boolean } = {}): Promise<Decision[]> {
   const supabase = client();
-  if (!supabase) return localDecisions();
-  let query = supabase.from("decisions").select(selection).eq("is_published", true).order("updated_at", { ascending:false }).limit(options.limit || 250);
+  if (!supabase) {const local=await localDecisions();return options.withRelations?local:local.map(decision=>({...decision,summary:excerpt(decision.summary,420),latestUpdate:excerpt(decision.latestUpdate,280),sources:[],timeline:[]}));}
+  let query = supabase.from("decisions").select(options.withRelations?detailSelection:listSelection).eq("is_published", true).order("updated_at", { ascending:false }).limit(options.limit || 250);
   if (!options.includeArchived) query = query.is("archived_at", null);
   const { data, error } = await query;
   if (error) { console.error("Unable to load CivicLens decisions", error.message); return []; }
-  const mapped=(data as Row[]).map(mapDecision);
+  const mapped=(data as unknown as Row[]).map(mapDecision);
   if(options.includeArchived)return mapped;
   const counts=new Map<string,number>();
   return mapped.filter(decision=>{const count=counts.get(decision.organization)||0;if(count>=50)return false;counts.set(decision.organization,count+1);return true});
@@ -52,7 +54,7 @@ export async function getDecision(slugOrId: string): Promise<Decision | null> {
   const supabase = client();
   if (!supabase) return (await localDecisions()).find(decision=>decision.slug===slugOrId||decision.id===slugOrId)||null;
   const field=/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(slugOrId)?"id":"slug";
-  const { data, error } = await supabase.from("decisions").select(selection).eq("is_published", true).eq(field,slugOrId).maybeSingle();
+  const { data, error } = await supabase.from("decisions").select(detailSelection).eq("is_published", true).eq(field,slugOrId).maybeSingle();
   if (error || !data) return null;
   return mapDecision(data as Row);
 }

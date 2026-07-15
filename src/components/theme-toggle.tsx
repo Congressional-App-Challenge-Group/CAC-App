@@ -1,0 +1,4 @@
+"use client";
+import{useEffect,useState}from"react";import{Moon,Sun}from"lucide-react";
+type Theme="light"|"dark";
+export function ThemeToggle(){const[theme,setTheme]=useState<Theme>("light");useEffect(()=>{setTheme(document.documentElement.dataset.theme==="dark"?"dark":"light")},[]);function toggle(){const next:Theme=theme==="dark"?"light":"dark";setTheme(next);document.documentElement.dataset.theme=next;document.documentElement.style.colorScheme=next;localStorage.setItem("civiclens-theme",next);document.querySelector('meta[name="theme-color"]')?.setAttribute("content",next==="dark"?"#071713":"#f7f7f3")}return <button onClick={toggle} className="theme-toggle" aria-label={`Switch to ${theme==="dark"?"light":"dark"} mode`} title={`Switch to ${theme==="dark"?"light":"dark"} mode`}>{theme==="dark"?<Sun size={17}/>:<Moon size={17}/>}</button>}

@@ -1,32 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { collectLegistar } from "../src/ingestion/adapters/legistar";
-import { governmentSources } from "../src/ingestion/sources";
-import { slugify } from "../src/ingestion/normalize";
-import { orgNames } from "../src/lib/civic";
-import type { Decision, TimelineEvent } from "../src/types";
-
-const lookback=Number(process.env.INGEST_LOOKBACK_DAYS||180);
-const since=new Date(Date.now()-lookback*86400000).toISOString().slice(0,10);
-const output=resolve(process.cwd(),".civiclens/local-decisions.json");
-const sources=governmentSources.filter(source=>source.kind==="legistar");
-const decisions:Decision[]=[];
-
-async function main(){
-for(const source of sources){
-  const result=await collectLegistar(source,since);
-  for(const item of result.items){
-    const id=`${source.key}-${item.externalId}`;
-    const completed=["Approved","Rejected","Completed"].includes(item.status);
-    const timeline:TimelineEvent[]=[{id:`${id}-${item.status}`,decisionId:id,date:item.eventDate,stage:item.status,title:item.actionText||item.status,description:item.body||item.title,whatChanged:`The official record currently lists this item as ${item.status}.`,state:completed?"completed":"current",verificationStatus:"verified"}];
-    decisions.push({id,slug:`${source.organization}-${item.externalId}-${slugify(item.title)}`,title:item.title,organization:item.organization,topic:item.topic,status:item.status,summary:item.body||item.title,whyItMatters:"This item was identified as a substantive action in an official government meeting record.",latestUpdate:item.actionText||`${item.status} as of ${item.eventDate}.`,nextStep:item.status==="Scheduled for vote"?`Scheduled government action on ${item.eventDate}.`:null,publishedAt:`${item.eventDate}T12:00:00Z`,updatedAt:`${item.eventDate}T12:00:00Z`,approvedAt:completed?`${item.eventDate}T12:00:00Z`:null,archivedAt:null,lastCheckedAt:new Date().toISOString(),affectedRoles:[],affectedZipCodes:[],affectedAreas:[],importantDates:[{date:item.eventDate,label:item.status}],isPublished:true,timeline,sources:[{id:`${id}-source`,decisionId:id,title:`${orgNames[item.organization]} official meeting record`,organization:orgNames[item.organization],url:item.url,publishedAt:item.eventDate,lastVerifiedAt:new Date().toISOString(),verificationStatus:"verified"}]});
-  }
-}
-
-const active=decisions.filter(decision=>!decision.approvedAt||Date.now()-new Date(decision.approvedAt).getTime()<=60*86400000).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
-await mkdir(dirname(output),{recursive:true});
-await writeFile(output,JSON.stringify(active,null,2));
-console.log(`Local cache: ${active.length} active source-backed decisions from ${sources.length} sources.`);
-}
-
+import{mkdir,writeFile}from"node:fs/promises";import{dirname,resolve}from"node:path";import{collectLegistar}from"../src/ingestion/adapters/legistar";import{governmentSources}from"../src/ingestion/sources";import{slugify}from"../src/ingestion/normalize";import{orgNames}from"../src/lib/civic";import type{Decision,TimelineEvent}from"../src/types";import type{NormalizedItem,SourceConfig}from"../src/ingestion/types";
+const lookback=Number(process.env.INGEST_LOOKBACK_DAYS||365);const since=new Date(Date.now()-lookback*86400000).toISOString().slice(0,10);const output=resolve(process.cwd(),".civiclens/local-decisions.json");const sources=governmentSources.filter(source=>source.kind==="legistar");
+async function main(){const groups=new Map<string,{source:SourceConfig;items:NormalizedItem[]}>();for(const source of sources){const result=await collectLegistar(source,since);for(const item of result.items){const key=`${source.key}:${item.entityId}`;const group=groups.get(key)||{source,items:[]};group.items.push(item);groups.set(key,group)}}const decisions:Decision[]=[];for(const[key,{source,items}]of groups){const ordered=[...items].sort((a,b)=>a.eventDate.localeCompare(b.eventDate));const latest=ordered.at(-1)!;const id=key;const completed=["Approved","Rejected","Completed"].includes(latest.status);const seen=new Set<string>();const timeline:TimelineEvent[]=ordered.filter(item=>{const eventKey=`${item.eventDate}:${item.status}:${item.actionText||item.body}`;if(seen.has(eventKey))return false;seen.add(eventKey);return true}).map((item,index,array)=>({id:`${id}:${item.externalId}:${item.status}`,decisionId:id,date:item.eventDate,stage:item.status,title:item.actionText||stageTitle(item.status,index===0),description:item.body||item.title,whatChanged:index===0?"This item entered the tracked public record.":`The official record moved this item to ${item.status}.`,state:index===array.length-1&&!completed?"current":"completed",verificationStatus:"verified"}));const first=ordered[0];const uniqueSources=[...new Map(ordered.map(item=>[item.url,item])).values()].map((item,index)=>({id:`${id}-source-${index}`,decisionId:id,title:`${orgNames[item.organization]} official meeting record`,organization:orgNames[item.organization],url:item.url,publishedAt:item.eventDate,lastVerifiedAt:new Date().toISOString(),verificationStatus:"verified" as const}));decisions.push({id,slug:`${source.organization}-${latest.entityId}-${slugify(latest.title)}`,title:latest.title,organization:latest.organization,topic:latest.topic,status:latest.status,summary:latest.body||latest.title,whyItMatters:"This item was identified as a substantive action in an official government meeting record.",latestUpdate:latest.actionText||`${latest.status} as of ${latest.eventDate}.`,nextStep:latest.status==="Scheduled for vote"?`Scheduled government action on ${latest.eventDate}.`:null,publishedAt:`${first.eventDate}T12:00:00Z`,updatedAt:`${latest.eventDate}T12:00:00Z`,approvedAt:completed?`${latest.eventDate}T12:00:00Z`:null,archivedAt:null,lastCheckedAt:new Date().toISOString(),affectedRoles:[],affectedZipCodes:[],affectedAreas:[],importantDates:[{date:latest.eventDate,label:latest.status}],isPublished:true,timeline,sources:uniqueSources})}const active=decisions.filter(decision=>!decision.approvedAt||Date.now()-new Date(decision.approvedAt).getTime()<=60*86400000).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));await mkdir(dirname(output),{recursive:true});await writeFile(output,JSON.stringify(active,null,2));const histories=active.filter(d=>d.timeline.length>1).length;console.log(`Local cache: ${active.length} active decisions; ${histories} include multi-event history from ${sources.length} sources.`)}
+function stageTitle(status:string,first:boolean){if(first)return"First tracked appearance";return status==="Under review"?"Reviewed by government body":status}
 main().catch(error=>{console.error(error);process.exitCode=1});
