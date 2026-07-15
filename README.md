@@ -1,61 +1,8 @@
-# CivicLens — Local development & Vercel deploy
+# CivicLens
 
-Quick steps to run locally and deploy to Vercel.
+CivicLens tracks source-backed decisions from the City of Charlotte, Mecklenburg County, and Charlotte-Mecklenburg Schools. Public pages read verified decisions, sources, and timelines from Supabase; there are no fictional fallback records.
 
-Local (development)
-
-1. Copy example env and fill values from your Supabase project:
-
-```bash
-cp .env.example .env.local
-# edit .env.local and set values for NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
-```
-
-2. Install and run dev server:
-
-```bash
-pnpm setup
-pnpm dev
-```
-
-Production (local build & serve)
-
-```bash
-pnpm build
-pnpm start
-```
-
-Vercel deployment checklist
-
-- Remove or update any custom `vercel.json` that targets static/Vite builds (this project uses Next.js).
-- Ensure the following env vars are set in the Vercel project settings (do NOT commit secrets):
-  - `NEXT_PUBLIC_SUPABASE_URL` (public)
-  - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (public)
-  - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
-- Confirm `package.json` contains `build` and `dev` scripts (uses `pnpm`).
-- Link the repo to Vercel via the dashboard or `vercel` CLI and trigger a deploy.
-
-Deploy via Vercel CLI (optional):
-
-```bash
-# install vercel CLI if needed
-pnpm add -g vercel
-# from repo root
-vercel login
-vercel --prod
-```
-
-Notes
-
-- Keep `.env.local` out of source control. Use Vercel's Environment Variables UI for production secrets.
-- If you want, I can also run a production build locally to validate the output — let me know.
-# CivicLens MVP
-
-CivicLens is a mobile-first civic decision tracker for Charlotte, Mecklenburg County, and CMS. This MVP uses clearly labeled fictional demonstration data and mocked assistant responses—no claims describe current government activity.
-
-## Run locally
-
-Requirements: Node.js 20+ and pnpm.
+## Setup
 
 ```bash
 pnpm install
@@ -63,24 +10,46 @@ cp .env.example .env.local
 pnpm dev
 ```
 
-Open `http://localhost:3000`. Supabase variables can remain blank for the seeded guest-mode demo. Guest preferences and follows use local storage as requested.
+Apply both SQL files in order:
 
-## Production setup
+1. `supabase/migrations/202607140001_civiclens_foundation.sql`
+2. `supabase/migrations/202607150001_live_ingestion.sql`
 
-1. Create a Supabase project and run `supabase/migrations/202607140001_civiclens_foundation.sql`.
-2. Fill in `.env.local` using `.env.example`.
-3. Replace the temporary admin flow with Supabase role claims before exposing write operations.
-4. Deploy to Vercel; the project uses standard Next.js build/start commands.
+Configure `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_URL`, and the server-only `SUPABASE_SERVICE_ROLE_KEY`. Never expose the service-role key to browser code.
 
-## Architecture
+## Daily ingestion
 
-- `src/data`: 12 fictional seeded decisions (4 per organization)
-- `src/features`: decisions, timeline, search, personalization, assistant, admin
-- `src/lib`: Zod validation and Supabase client boundary
-- `src/server`: interfaces for future source monitoring, summarization, and retrieval
-- `supabase/migrations`: PostgreSQL schema, relationships, RLS policies
-- `public`: manifest, icon, and basic offline service worker
+```bash
+pnpm ingest
+INGEST_SOURCE=charlotte-legistar pnpm ingest
+```
 
-## Quality and safety
+Configured sources:
 
-Run `pnpm build` for strict TypeScript and production validation. All assistant answers are deterministic and cite demo sources. Unknown cost questions use the required “cannot confirm” fallback. Live scraping and AI are intentionally not included.
+- Charlotte Legistar: meeting and agenda-item extraction
+- Mecklenburg County Legistar: meeting and agenda-item extraction
+- CMS BoardDocs: official index snapshot and link discovery; items remain staged until its item parser is validated
+
+The job stores source snapshots, hashes, and normalized candidates. Candidates are private by default. `AUTO_PUBLISH_INGESTION=true` publishes substantive Legistar items and appends source-backed timeline events; enable it only after reviewing target-project results.
+
+`.github/workflows/daily-ingestion.yml` runs daily at 10:17 UTC. Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as GitHub Actions secrets. Keep its `AUTO_PUBLISH_INGESTION` repository variable unset until validation is complete.
+
+## Lifecycle
+
+- Every public surface consumes the same Supabase records.
+- Stage, organization, topic, personalization, and recency filters operate on active records.
+- Source hashes distinguish real changes from unchanged documents.
+- `archive_stale_decisions()` hides approved/rejected/funded/completed items 60 days after approval.
+- Archived records retain their permanent page, sources, and timeline.
+- Active `Implementation` records are not automatically archived.
+
+An agenda appearance is not treated as approval. Unknown affected groups, ZIP codes, costs, and next steps remain empty rather than being guessed. The linked government record is authoritative.
+
+The admin area is intentionally read-only until Supabase authentication and editorial role claims protect mutations.
+
+## Verify
+
+```bash
+pnpm exec tsc --noEmit
+pnpm build
+```

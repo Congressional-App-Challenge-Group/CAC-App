@@ -1,4 +1,5 @@
-import type {Metadata,Viewport} from "next";import "./globals.css";import {Analytics} from "@vercel/analytics/next";import {Header} from "@/components/layout/nav";import {PreferencesProvider} from "@/features/preferences/preferences";import{PwaRegister}from"@/components/pwa-register";
+import type {Metadata,Viewport} from "next";import "./globals.css";import {Analytics} from "@vercel/analytics/next";import {Header} from "@/components/layout/nav";import {PreferencesProvider} from "@/features/preferences/preferences";import{PwaRegister}from"@/components/pwa-register";import{DecisionsProvider}from"@/components/decisions-provider";import{getDecisions}from"@/server/decisions";
 export const metadata:Metadata={title:{default:"CivicLens",template:"%s · CivicLens"},description:"Know what is changing before it affects you.",manifest:"/manifest.webmanifest"};
 export const viewport:Viewport={themeColor:"#17362f",width:"device-width",initialScale:1};
-export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body><PreferencesProvider><PwaRegister/><Header/><main>{children}</main></PreferencesProvider><Analytics/></body></html>}
+export const dynamic="force-dynamic";
+export default async function RootLayout({children}:{children:React.ReactNode}){const decisions=await getDecisions();return <html lang="en"><body><DecisionsProvider decisions={decisions}><PreferencesProvider><PwaRegister/><Header/><main>{children}</main></PreferencesProvider></DecisionsProvider><Analytics/></body></html>}

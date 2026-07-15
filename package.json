@@ -4,11 +4,14 @@
   "private": true,
   "scripts": {
     "setup": "pnpm install",
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "pnpm ingest:local && next dev",
+    "build": "pnpm ingest:local && next build",
     "serve": "pnpm build && pnpm start",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "ingest": "tsx scripts/ingest.ts",
+    "ingest:local": "tsx scripts/ingest-local.ts",
+    "ingest:publish": "AUTO_PUBLISH_INGESTION=true tsx scripts/ingest.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
@@ -27,6 +30,7 @@
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.20.3",
     "typescript": "^5.7.2"
   },
   "packageManager": "pnpm@10.33.0"
