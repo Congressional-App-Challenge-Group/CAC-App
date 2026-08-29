@@ -3,6 +3,9 @@ export type UserRole = typeof roles[number];
 export const interests = ["Education","School boundaries","School transportation","Student policies","School construction","CMS budget","Housing","Development and rezoning","Roads","Public transit","Public safety","Parks","Taxes","Government budgets","Public health","Libraries","Environment"] as const;
 export const statuses = ["Proposed","Public feedback","Under review","Scheduled for vote","Approved","Rejected","Funded","Implementation","Completed","Delayed"] as const;
 export type DecisionStatus = typeof statuses[number];
+// Values arrays for server/client validation without leaking tuple-only literals.
+export const statusValues: readonly string[] = statuses as readonly string[];
+export const organizationValues = ["charlotte","mecklenburg-county","cms"] as const;
 export type Organization = "charlotte" | "mecklenburg-county" | "cms";
 export type TimelineEvent = { id:string; decisionId:string; date:string; stage:DecisionStatus; title:string; description:string; whatChanged?:string; state:"completed"|"current"|"upcoming"|"delayed"|"cancelled"; sourceId?:string; verificationStatus:"verified"|"reviewed"|"unconfirmed" };
 export type CivicSource = { id:string; decisionId:string; title:string; organization:string; url:string; publishedAt?:string; pageReference?:string; lastVerifiedAt:string; verificationStatus:"verified"|"reviewed"|"unconfirmed" };
