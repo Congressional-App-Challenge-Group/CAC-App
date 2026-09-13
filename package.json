@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "setup": "pnpm install",
-    "dev": "next dev",
-    "dev:data": "pnpm ingest:local && pnpm enrich && pnpm changes && next dev",
-    "build": "next build",
+    "dev": "pnpm ensure:data && next dev",
+    "dev:fast": "next dev",
+    "build": "pnpm ensure:data && next build",
+    "ensure:data": "node --import tsx scripts/prepare-data.ts",
     "serve": "pnpm build && pnpm start",
     "start": "next start",
     "lint": "next lint",

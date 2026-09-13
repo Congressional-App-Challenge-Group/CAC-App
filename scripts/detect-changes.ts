@@ -29,6 +29,9 @@ async function main() {
       "publication, not a movement.",
     );
     await writeJson("snapshots/latest.json", toSnapshot(decisions));
+    // Write the artifact even when empty, so a fresh install has a valid (empty)
+    // change log rather than a missing file that looks like a failure.
+    await writeJson("changes.json", []);
     report("Change detection", lines);
     return;
   }

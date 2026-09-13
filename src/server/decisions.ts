@@ -152,10 +152,40 @@ function mapDecision(row: Row): Decision {
 /* Local artifact fallback                                                     */
 /* -------------------------------------------------------------------------- */
 
+const warned = new Set<string>();
+
+const warnOnce = (key: string, message: string) => {
+  if (warned.has(key)) return;
+  warned.add(key);
+  console.warn(message);
+};
+
 async function readArtifact<T>(file: string): Promise<T | null> {
   try {
     return JSON.parse(await readFile(resolve(process.cwd(), ".civiclens", file), "utf8")) as T;
-  } catch {
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+
+    // A missing optional artifact is normal on a first run (an empty change log,
+    // for instance). Only the primary dataset being absent is worth shouting
+    // about, because an empty site previously looked identical to "no data yet".
+    if (code === "ENOENT") {
+      if (file === "local-decisions.json") {
+        warnOnce(
+          file,
+          "[civiclens] No static dataset found and Supabase is not configured, so public pages " +
+            "will render empty. Run `pnpm ensure:data` to generate .civiclens/local-decisions.json.",
+        );
+      }
+      return null;
+    }
+
+    warnOnce(
+      file,
+      `[civiclens] .civiclens/${file} exists but could not be read (${
+        error instanceof Error ? error.message : "unknown"
+      }). Continuing without it.`,
+    );
     return null;
   }
 }
