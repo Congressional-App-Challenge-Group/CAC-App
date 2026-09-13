@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { changeId, changesSince, diffSnapshots, groupChangesByDecision, toSnapshot } from "./changes";
+import {
+  changeId,
+  changesSince,
+  diffSnapshots,
+  groupChangesByDecision,
+  holdBackPipelineResolutions,
+  toSnapshot,
+} from "./changes";
 import type { Decision } from "@/types";
 
 function decision(overrides: Partial<Decision> = {}): Decision {
@@ -95,6 +102,33 @@ test("diffSnapshots ignores a timeline that shrank, which usually means a re-par
   assert.equal(changes.filter((change) => change.field === "timeline").length, 0);
 });
 
+test("diffSnapshots reports a newly scheduled action date as a change", () => {
+  // A vote date being set is the single movement a resident most needs to hear
+  // about, so the deadline itself is a comparable field.
+  const before = toSnapshot([decision()], "2026-09-01T00:00:00.000Z");
+  const after = [
+    decision({
+      deadline: { date: "2026-09-28", label: "Council agenda", origin: "official-tracker" },
+      updatedAt: "2026-09-05T12:00:00Z",
+    }),
+  ];
+
+  const changes = diffSnapshots(before, after);
+  const deadline = changes.find((change) => change.field === "deadline");
+  assert.ok(deadline);
+  assert.equal(deadline?.previous, null);
+  assert.equal(deadline?.current, "2026-09-28");
+});
+
+test("diffSnapshots ignores a deadline that only lost its date", () => {
+  const before = toSnapshot(
+    [decision({ deadline: { date: "2026-09-28", origin: "official-tracker" } })],
+    "2026-09-01T00:00:00.000Z",
+  );
+  const after = [decision({ updatedAt: "2026-09-05T12:00:00Z" })];
+  assert.equal(diffSnapshots(before, after).filter((c) => c.field === "deadline").length, 0);
+});
+
 test("diffSnapshots respects a maxAgeDays window", () => {
   const before = toSnapshot([decision()], "2020-01-01T00:00:00.000Z");
   const after = [decision({ status: "Rejected", updatedAt: "2020-01-02T00:00:00Z" })];
@@ -122,6 +156,78 @@ test("groupChangesByDecision groups multiple fields on one record", () => {
   assert.equal(groups.length, 1);
   assert.equal(groups[0].changes.length, 2);
   assert.ok(groups[0].changes.some((change) => change.field === "nextStep"));
+});
+
+test("holdBackPipelineResolutions removes only the fields the pipeline rewrote", () => {
+  const before = toSnapshot(
+    [decision({ id: "a" }), decision({ id: "b" })],
+    "2026-09-01T00:00:00.000Z",
+  );
+  const after = [
+    decision({ id: "a", status: "Approved", updatedAt: "2026-09-05T12:00:00Z" }),
+    decision({ id: "b", status: "Rejected", updatedAt: "2026-09-05T12:00:00Z" }),
+  ];
+
+  const detected = diffSnapshots(before, after);
+  const { changes, heldBack } = holdBackPipelineResolutions(detected, {
+    producedAt: "2026-09-05T12:00:00Z",
+    reason: "matter-register-resolution",
+    entries: [{ decisionId: "a", fields: ["status"] }],
+  });
+
+  assert.equal(heldBack.length, 1);
+  assert.equal(heldBack[0].decisionId, "a");
+  assert.deepEqual(
+    changes.map((change) => change.decisionId),
+    ["b"],
+    "a genuine change on an untouched record still reports",
+  );
+});
+
+test("a held-back record still reports movement in a field the pipeline did not touch", () => {
+  const before = toSnapshot([decision({ id: "a" })], "2026-09-01T00:00:00.000Z");
+  const after = [
+    decision({
+      id: "a",
+      status: "Approved",
+      updatedAt: "2026-09-05T12:00:00Z",
+      timeline: [
+        {
+          id: "t1",
+          decisionId: "a",
+          date: "2026-09-05",
+          stage: "Approved",
+          title: "Approved",
+          description: "Approved by Council",
+          state: "completed",
+          verificationStatus: "verified",
+        },
+      ],
+    }),
+  ];
+
+  const { changes, heldBack } = holdBackPipelineResolutions(diffSnapshots(before, after), {
+    producedAt: "2026-09-05T12:00:00Z",
+    reason: "matter-register-resolution",
+    entries: [{ decisionId: "a", fields: ["status"] }],
+  });
+
+  assert.equal(heldBack.length, 1);
+  assert.deepEqual(
+    changes.map((change) => change.field),
+    ["timeline"],
+    "the real new action survives while the rewritten stage does not",
+  );
+});
+
+test("holdBackPipelineResolutions is a no-op with no marker", () => {
+  const before = toSnapshot([decision()], "2026-09-01T00:00:00.000Z");
+  const after = [decision({ status: "Approved", updatedAt: "2026-09-05T12:00:00Z" })];
+  const detected = diffSnapshots(before, after);
+
+  const { changes, heldBack } = holdBackPipelineResolutions(detected, null);
+  assert.equal(changes.length, detected.length);
+  assert.equal(heldBack.length, 0);
 });
 
 test("changesSince filters to the requested window", () => {

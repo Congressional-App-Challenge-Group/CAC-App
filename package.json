@@ -12,15 +12,17 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/lib/geography.test.ts src/lib/changes.test.ts src/lib/enrichment.test.ts",
+    "test": "node --import tsx --test src/lib/*.test.ts src/ingestion/*.test.ts",
     "ingest": "node --env-file-if-exists=.env.local --import tsx scripts/ingest.ts",
     "ingest:local": "node --import tsx scripts/ingest-local.ts",
     "ingest:publish": "AUTO_PUBLISH_INGESTION=true node --env-file-if-exists=.env.local --import tsx scripts/ingest.ts",
     "enrich": "pnpm enrich:geography && pnpm enrich:language",
     "enrich:geography": "node --env-file-if-exists=.env.local --import tsx scripts/enrich-geography.ts",
     "enrich:language": "node --env-file-if-exists=.env.local --import tsx scripts/enrich-plain-language.ts",
+    "enrich:matters": "node --import tsx scripts/enrich-matters.ts",
     "changes": "node --import tsx scripts/detect-changes.ts",
-    "pipeline": "pnpm ingest:local && pnpm changes && pnpm enrich"
+    "deadlines": "node --import tsx scripts/report-deadlines.ts",
+    "pipeline": "pnpm ingest:local && pnpm enrich:matters && pnpm changes && pnpm enrich"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

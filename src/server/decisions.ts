@@ -6,6 +6,7 @@ import type {
   CivicSource,
   Decision,
   DecisionChange,
+  DecisionDeadline,
   DecisionDraft,
   DecisionGeography,
   DecisionMoney,
@@ -97,6 +98,24 @@ function mapMoney(row: Row): DecisionMoney | undefined {
   return { amountUsd: amount, fiscalYear, fundingSource };
 }
 
+/**
+ * The next scheduled official action, as published by the government's own
+ * register. Absent means the record states no date, which the interface reports
+ * as "no date on record" rather than substituting a guess.
+ */
+function mapDeadline(row: Row): DecisionDeadline | undefined {
+  const date = text(row.deadline_date).slice(0, 10);
+  if (!date) return undefined;
+  const origin = text(row.deadline_origin, "official-tracker");
+  return {
+    date,
+    label: text(row.deadline_label) || undefined,
+    sourceUrl: text(row.deadline_source_url) || undefined,
+    officialStatus: text(row.official_status) || undefined,
+    origin: origin === "record-text" ? "record-text" : "official-tracker",
+  };
+}
+
 function mapDraftRow(row: Record<string, unknown>): DecisionDraft {
   const excerpts = row.source_excerpts;
   return {
@@ -142,6 +161,8 @@ function mapDecision(row: Row): Decision {
     timeline: (row.timeline_events || []).map(mapEvent).sort((a, b) => a.date.localeCompare(b.date)),
     geography: mapGeography(row),
     money: mapMoney(row),
+    deadline: mapDeadline(row),
+    requester: text(row.requester) || undefined,
   };
 
   const drafts = (row.decision_drafts || []).map(mapDraftRow);
@@ -213,7 +234,10 @@ function pruneForList(decision: Decision): Decision {
 /* -------------------------------------------------------------------------- */
 
 const baseListSelection =
-  "id,slug,title,organization,topic,status,summary,why_it_matters,latest_update,next_step,published_at,updated_at,approved_at,archived_at,last_checked_at,affected_roles,affected_zip_codes,affected_areas,important_dates,before_text,after_text,is_published,amount_usd,fiscal_year,funding_source";
+  "id,slug,title,organization,topic,status,summary,why_it_matters,latest_update,next_step,published_at,updated_at,approved_at,archived_at,last_checked_at,affected_roles,affected_zip_codes,affected_areas,important_dates,before_text,after_text,is_published,amount_usd,fiscal_year,funding_source,requester,deadline_date,deadline_label,deadline_source_url,deadline_origin,official_status";
+
+/** Columns added by the deadlines migration. */
+const SPINE_MISSING = /decision_geography|decision_drafts|amount_usd|requester|deadline_date|official_status/;
 
 const spineListSelection = `${baseListSelection},decision_geography(address,latitude,longitude,zip_code,council_district,neighborhood,method,confidence)`;
 
@@ -250,9 +274,10 @@ export async function getDecisions(options: GetOptions = {}): Promise<Decision[]
 
   let { data, error } = await buildQuery(options.withRelations ? spineDetailSelection : spineListSelection);
 
-  if (error && /decision_geography|decision_drafts|amount_usd/.test(error.message)) {
+  if (error && SPINE_MISSING.test(error.message)) {
     console.warn(
-      "CivicLens spine columns are missing — apply supabase/migrations/202609010001_civiclens_spine.sql. Falling back to base selection.",
+      "CivicLens spine columns are missing — apply the supabase/migrations/202609010001 and " +
+        "202609130001 migrations. Falling back to the base selection.",
     );
     ({ data, error } = await buildQuery(options.withRelations ? "*, sources(*), timeline_events(*)" : baseListSelection));
   }
@@ -309,7 +334,7 @@ export async function getDecision(slugOrId: string): Promise<Decision | null> {
     .eq(field, slugOrId)
     .maybeSingle();
 
-  if (error && /decision_geography|decision_drafts/.test(error.message)) {
+  if (error && SPINE_MISSING.test(error.message)) {
     ({ data, error } = await supabase
       .from("decisions")
       .select("*, sources(*), timeline_events(*)")

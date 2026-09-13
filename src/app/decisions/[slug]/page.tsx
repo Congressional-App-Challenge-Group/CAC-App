@@ -20,6 +20,8 @@ import { ParticipationPanel } from "@/features/decisions/participation";
 import { AskBox } from "@/features/assistant/ask-box";
 import { ProvenancePanel } from "@/components/ui/provenance";
 import { MiniMap } from "@/components/ui/map";
+import { DeadlinePanel } from "@/components/ui/deadline";
+import { formatDeadlineDate, nextDeadline } from "@/lib/deadlines";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Note, Surface } from "@/components/ui/card";
 import { Stat } from "@/components/ui/stat";
@@ -100,8 +102,20 @@ export default async function DecisionPage({ params }: { params: Promise<{ slug:
 
   const geography = decision.geography;
   const located = hasCoordinates(geography);
-  const nextDate = decision.importantDates[0];
   const hasBeforeAfter = Boolean(decision.beforeText || decision.afterText);
+
+  // The deadline engine prefers the government's own register over inferred dates,
+  // so the "next date" tile and the countdown always agree.
+  const now = new Date();
+  const deadline = nextDeadline(decision, now);
+  const nextDate = decision.importantDates[0];
+  const nextDateText = deadline
+    ? `${formatDeadlineDate(deadline.date!)}${
+        deadline.origin === "official-tracker" ? " · from the government's register" : ""
+      }`
+    : nextDate
+      ? `${nextDate.date} · ${nextDate.label}`
+      : "None confirmed";
 
   let sectionNumber = 1;
   const nextNumber = () => String(sectionNumber++).padStart(2, "0");
@@ -133,7 +147,17 @@ export default async function DecisionPage({ params }: { params: Promise<{ slug:
 
           <h1 className="mt-4 max-w-4xl display-2 text-ink md:text-5xl">{decision.title}</h1>
 
+          {decision.requester ? (
+            <p className="mt-3 text-sm text-muted">
+              Requested by <b className="text-ink">{decision.requester}</b>
+            </p>
+          ) : null}
+
           <p className="mt-6 max-w-3xl reading md:text-lg">{decision.summary}</p>
+
+          <div className="mt-7 max-w-2xl">
+            <DeadlinePanel decision={decision} now={now} />
+          </div>
 
           {!decision.plainLanguageApproved ? (
             <Note tone="neutral" className="mt-5 flex items-start gap-2">
@@ -163,7 +187,7 @@ export default async function DecisionPage({ params }: { params: Promise<{ slug:
             <FactTile
               icon={<CalendarDays size={18} />}
               title="Next important date"
-              text={nextDate ? `${nextDate.date} · ${nextDate.label}` : "None confirmed"}
+              text={nextDateText}
             />
             <FactTile
               icon={<Wallet size={18} />}
@@ -304,6 +328,8 @@ export default async function DecisionPage({ params }: { params: Promise<{ slug:
             sources={decision.sources}
             lastCheckedAt={decision.lastCheckedAt}
             geography={geography}
+            requester={decision.requester}
+            officialStatus={decision.deadline?.officialStatus}
           />
         </aside>
       </div>

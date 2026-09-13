@@ -7,6 +7,7 @@ import { orgNames } from "@/lib/civic";
 import { locationHint } from "@/lib/enrichment";
 import { usePreferences } from "@/features/preferences/preferences";
 import { StatusBadge } from "@/components/ui/badge";
+import { CountdownBadge } from "@/components/ui/deadline";
 import { cn } from "@/lib/cn";
 
 export function DecisionCard({ decision, reason }: { decision: Decision; reason?: string }) {
@@ -25,7 +26,10 @@ export function DecisionCard({ decision, reason }: { decision: Decision; reason?
           <Landmark size={13} />
           {orgNames[decision.organization]}
         </span>
-        <StatusBadge status={decision.status} />
+        <div className="flex flex-col items-end gap-1.5">
+          <StatusBadge status={decision.status} />
+          <CountdownBadge decision={decision} />
+        </div>
       </div>
 
       <div className="mt-5">

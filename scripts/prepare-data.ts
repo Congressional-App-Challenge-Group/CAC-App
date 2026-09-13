@@ -32,7 +32,10 @@ type Step = { label: string; script: string; required: boolean };
 // and is a scheduled editorial job, not a build step.
 const STEPS: Step[] = [
   { label: "ingest:local", script: "scripts/ingest-local.ts", required: true },
+  { label: "enrich:matters", script: "scripts/enrich-matters.ts", required: false },
   { label: "enrich:geography", script: "scripts/enrich-geography.ts", required: false },
+  // Order matters: change detection must run after matter resolution so the
+  // pipeline's own re-resolving is absorbed instead of reported as movement.
   { label: "detect-changes", script: "scripts/detect-changes.ts", required: false },
 ];
 

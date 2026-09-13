@@ -1,4 +1,4 @@
-import { ExternalLink, MapPin, ShieldCheck } from "lucide-react";
+import { Building2, ExternalLink, MapPin, ShieldCheck } from "lucide-react";
 import type { CivicSource, DecisionGeography } from "@/types";
 import { confidenceLabel, methodLabel } from "@/lib/geography";
 import { Badge, VerificationBadge } from "./badge";
@@ -25,10 +25,16 @@ export function ProvenancePanel({
   sources,
   lastCheckedAt,
   geography,
+  requester,
+  officialStatus,
 }: {
   sources: CivicSource[];
   lastCheckedAt?: string | null;
   geography?: DecisionGeography;
+  /** Who the government's own register names as the requester. */
+  requester?: string;
+  /** The register's stage label, quoted verbatim. */
+  officialStatus?: string;
 }) {
   return (
     <div className="surface p-5 text-sm">
@@ -54,7 +60,26 @@ export function ProvenancePanel({
             {sources.length} attached
           </dd>
         </div>
+        {officialStatus ? (
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-subtle">Register says</dt>
+            <dd className="font-bold text-ink-soft">“{officialStatus}”</dd>
+          </div>
+        ) : null}
       </dl>
+
+      {requester ? (
+        <div className="mt-4 border-t border-line pt-4">
+          <div className="flex items-center gap-2 text-xs font-extrabold text-ink">
+            <Building2 size={14} className="text-civic" aria-hidden="true" />
+            Requested by
+          </div>
+          <p className="mt-2 text-xs leading-5 text-muted">
+            <b className="text-ink-soft">{requester}</b> — as named in the government&apos;s own
+            matter register.
+          </p>
+        </div>
+      ) : null}
 
       {sources.length ? (
         <ul className="mt-4 space-y-2 border-t border-line pt-4">

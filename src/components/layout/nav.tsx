@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Bot, Compass, Heart, Home, MapPin, Settings2, ShieldCheck } from "lucide-react";
+import { Activity, Bot, Clock, Compass, FileWarning, Heart, Home, MapPin, Settings2, ShieldCheck } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { usePreferences } from "@/features/preferences/preferences";
 import { useSession } from "@/components/session-provider";
@@ -10,15 +10,21 @@ import { cn } from "@/lib/cn";
 
 const desktopLinks = [
   { href: "/", label: "Brief", icon: Home },
+  { href: "/deadlines", label: "Deadlines", icon: Clock },
   { href: "/explore", label: "Explore", icon: Compass },
   { href: "/changes", label: "Changes", icon: Activity },
   { href: "/my-area", label: "My area", icon: MapPin },
   { href: "/following", label: "Following", icon: Heart },
   { href: "/ask", label: "Ask", icon: Bot },
+  { href: "/evidence", label: "Evidence", icon: FileWarning },
 ];
 
-// Mobile keeps five slots; Changes stays reachable from the brief and footer.
-const mobileLinks = desktopLinks.filter((link) => link.href !== "/changes");
+// Mobile keeps five slots, so it shows the two modes the product is built around
+// (what's next, what happened) plus the three personal surfaces. The rest stays
+// reachable from the brief and the footer.
+const mobileLinks = desktopLinks.filter((link) =>
+  ["/", "/deadlines", "/changes", "/my-area", "/following"].includes(link.href),
+);
 
 export function Header() {
   const path = usePathname();

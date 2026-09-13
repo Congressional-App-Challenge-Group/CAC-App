@@ -399,6 +399,13 @@
     color: rgb(var(--danger));
   }
 
+  /* Withdrawn is neutral, not adverse: the sponsor pulled the item, which is 
+     not a rejection and should not be coloured like one. */
+  .status[data-status="Withdrawn"] {
+    background: rgb(var(--surface-3));
+    color: rgb(var(--subtle));
+  }
+
   .status[data-status="Scheduled for vote"] {
     background: rgb(var(--warning-bg));
     color: rgb(var(--warning));

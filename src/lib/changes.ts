@@ -23,6 +23,8 @@ export type SnapshotEntry = {
   nextStep: string | null;
   updatedAt: string;
   timelineCount: number;
+  /** Date of the next scheduled action, so a vote date being set reads as movement. */
+  deadlineDate: string | null;
   sourceUrl?: string;
 };
 
@@ -38,12 +40,15 @@ const COMPARABLE_FIELDS: ChangeField[] = [
   "summary",
   "whyItMatters",
   "timeline",
+  "deadline",
 ];
 
 function fieldValue(entry: SnapshotEntry, field: ChangeField): string | null {
   switch (field) {
     case "timeline":
       return String(entry.timelineCount);
+    case "deadline":
+      return entry.deadlineDate;
     case "nextStep":
       return entry.nextStep ?? null;
     default:
@@ -69,6 +74,7 @@ export function toSnapshotEntry(decision: Decision): SnapshotEntry {
     nextStep: decision.nextStep,
     updatedAt: decision.updatedAt,
     timelineCount: decision.timeline.length,
+    deadlineDate: decision.deadline?.date ?? null,
     sourceUrl: decision.sources[0]?.url,
   };
 }
@@ -120,6 +126,9 @@ export function diffSnapshots(
       if (field === "timeline" && Number(currentValue ?? 0) <= Number(previousValue ?? 0)) {
         continue;
       }
+      // A cleared deadline is bookkeeping (the date passed, or a re-parse), not
+      // news. Only a newly stated action date is reported.
+      if (field === "deadline" && !currentValue) continue;
 
       const changedAt = decision.updatedAt || previous.capturedAt;
       if (cutoff && new Date(changedAt).getTime() < cutoff) continue;
@@ -140,6 +149,48 @@ export function diffSnapshots(
   }
 
   return changes.sort((a, b) => b.changedAt.localeCompare(a.changedAt));
+}
+
+/** What a pipeline job reports it rewrote, so its own edits are not misread as movement. */
+export type PipelineResolution = {
+  producedAt: string;
+  reason: string;
+  entries: Array<{ decisionId: string; fields: string[] }>;
+};
+
+/**
+ * Split pipeline-caused edits out of a change set.
+ *
+ * A dataset upgrade is not public movement. When an enrichment job fills in
+ * hundreds of previously blank outcomes, every one of those records genuinely
+ * differs from the last snapshot — but no government decided anything new.
+ * Reporting that as hundreds of "changes" would make the movement feed
+ * meaningless on the run it matters most, so the job names exactly which records
+ * and fields it rewrote and those are held back.
+ *
+ * The match is per record *and* field, so an unrelated genuine movement on the
+ * same record — a new timeline event, say — still reports normally.
+ */
+export function holdBackPipelineResolutions(
+  changes: DecisionChange[],
+  resolution: PipelineResolution | null,
+): { changes: DecisionChange[]; heldBack: DecisionChange[] } {
+  if (!resolution) return { changes, heldBack: [] };
+
+  const rewritten = new Set(
+    resolution.entries.flatMap((entry) =>
+      entry.fields.map((field) => `${entry.decisionId}:${field}`),
+    ),
+  );
+
+  const kept: DecisionChange[] = [];
+  const heldBack: DecisionChange[] = [];
+  for (const change of changes) {
+    if (rewritten.has(`${change.decisionId}:${change.field}`)) heldBack.push(change);
+    else kept.push(change);
+  }
+
+  return { changes: kept, heldBack };
 }
 
 export function changesSince(changes: DecisionChange[], days: number): DecisionChange[] {
@@ -183,6 +234,8 @@ export function changeFieldLabel(field: ChangeField): string {
       return "Impact note revised";
     case "timeline":
       return "New action recorded";
+    case "deadline":
+      return "Scheduled action date set";
     default:
       return "Updated";
   }

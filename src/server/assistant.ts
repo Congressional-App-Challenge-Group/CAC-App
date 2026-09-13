@@ -30,7 +30,7 @@ function stageBlurb(status: Decision["status"]): string {
     case "Public feedback":
       return "open for public feedback during the public comment window.";
     case "Under review":
-      return "under review by the governing body.The indexed official record does not yet state an outcome.";
+      return "under review by the governing body. The indexed official record does not yet state an outcome.";
     case "Scheduled for vote":
       return "scheduled for a vote by the governing body.";
     case "Approved":
@@ -45,6 +45,8 @@ function stageBlurb(status: Decision["status"]): string {
       return "completed according to the official record.";
     case "Delayed":
       return "currently delayed. The official record does not state a new date.";
+    case "Withdrawn":
+      return "withdrawn by its sponsor, so it is no longer proceeding. This is not a rejection by the governing body.";
   }
 }
 

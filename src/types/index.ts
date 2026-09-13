@@ -43,8 +43,39 @@ export const statuses = [
   "Implementation",
   "Completed",
   "Delayed",
+  "Withdrawn",
 ] as const;
 export type DecisionStatus = (typeof statuses)[number];
+
+/**
+ * Stage groupings, declared once so the brief, the deadline engine and the
+ * filters cannot drift apart on what "still open" means.
+ *
+ * Delayed is open on purpose: a postponed matter is still live and can still be
+ * acted on, which is exactly the case the tracker previously hid.
+ */
+export const openStatuses = [
+  "Proposed",
+  "Public feedback",
+  "Under review",
+  "Scheduled for vote",
+  "Delayed",
+] as const;
+
+export const decidedStatuses = [
+  "Approved",
+  "Rejected",
+  "Funded",
+  "Implementation",
+  "Completed",
+  "Withdrawn",
+] as const;
+
+export const isOpenStatus = (status: DecisionStatus): boolean =>
+  (openStatuses as readonly string[]).includes(status);
+
+export const isDecidedStatus = (status: DecisionStatus): boolean =>
+  (decidedStatuses as readonly string[]).includes(status);
 
 // Values arrays for server/client validation without leaking tuple-only literals.
 export const statusValues: readonly string[] = statuses as readonly string[];
@@ -122,6 +153,29 @@ export type DecisionMoney = {
 };
 
 /* -------------------------------------------------------------------------- */
+/* Deadlines — the moment a decision stops being changeable                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Where a deadline came from. The distinction matters: a date taken from the
+ * government's own matter register is a stronger claim than one read out of
+ * record prose, and the interface says which it is.
+ */
+export type DeadlineOrigin = "official-tracker" | "record-text";
+
+export type DecisionDeadline = {
+  /** ISO date (YYYY-MM-DD) of the next scheduled official action. */
+  date?: string;
+  /** How the record itself describes that date. */
+  label?: string;
+  /** Official record the date came from. */
+  sourceUrl?: string;
+  /** The government's own stage label, quoted verbatim. */
+  officialStatus?: string;
+  origin: DeadlineOrigin;
+};
+
+/* -------------------------------------------------------------------------- */
 /* Change detection — what makes "following" mean something                    */
 /* -------------------------------------------------------------------------- */
 
@@ -132,6 +186,7 @@ export const changeFields = [
   "summary",
   "whyItMatters",
   "timeline",
+  "deadline",
 ] as const;
 export type ChangeField = (typeof changeFields)[number];
 
@@ -203,6 +258,18 @@ export type Decision = {
   geography?: DecisionGeography;
   /** Populated when an official record states a figure. */
   money?: DecisionMoney;
+  /**
+   * The next scheduled official action. Deadlines are only ever read from a
+   * date the record already states — CivicLens does not compute comment windows
+   * the government has not published.
+   */
+  deadline?: DecisionDeadline;
+  /**
+   * Who the government's own register names as the requester. Often a department
+   * ("Transportation"), sometimes an individual staff member, so the interface
+   * attributes it as "Requested by" rather than labelling both as a department.
+   */
+  requester?: string;
   /** True when the summary/why-it-matters shown came from an approved draft. */
   plainLanguageApproved?: boolean;
 };

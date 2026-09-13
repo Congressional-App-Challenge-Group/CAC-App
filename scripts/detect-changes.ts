@@ -1,6 +1,13 @@
-import { diffSnapshots, toSnapshot, type Snapshot } from "../src/lib/changes";
+import { rm } from "node:fs/promises";
+import {
+  diffSnapshots,
+  holdBackPipelineResolutions,
+  toSnapshot,
+  type PipelineResolution,
+  type Snapshot,
+} from "../src/lib/changes";
 import type { Decision, DecisionChange } from "../src/types";
-import { readJson, report, serviceClient, writeJson } from "./shared";
+import { cachePath, readJson, report, serviceClient, writeJson } from "./shared";
 
 /**
  * Change detection.
@@ -29,6 +36,9 @@ async function main() {
       "publication, not a movement.",
     );
     await writeJson("snapshots/latest.json", toSnapshot(decisions));
+    // The baseline already contains any pipeline resolution, so the marker is
+    // obsolete once it has been absorbed.
+    await rm(cachePath("resolution.json"), { force: true });
     // Write the artifact even when empty, so a fresh install has a valid (empty)
     // change log rather than a missing file that looks like a failure.
     await writeJson("changes.json", []);
@@ -36,7 +46,21 @@ async function main() {
     return;
   }
 
-  const changes = diffSnapshots(previous, decisions);
+  /*
+   * A dataset upgrade is not public movement.
+   *
+   * When matter resolution fills in hundreds of previously blank outcomes, every
+   * one of those records genuinely differs from the last snapshot — but the
+   * government did not decide anything new. Reporting that as hundreds of
+   * "changes" would make the movement feed meaningless, so the pipeline marks
+   * what it rewrote and those specific records are held back. The snapshot still
+   * advances, so the resolution is absorbed rather than re-reported forever.
+   */
+  const marker = await readJson<PipelineResolution>("resolution.json");
+  const { changes, heldBack } = holdBackPipelineResolutions(
+    diffSnapshots(previous, decisions),
+    marker,
+  );
 
   const archive = (await readJson<DecisionChange[]>("changes.json")) ?? [];
   const seen = new Set(archive.map((change) => change.id));
@@ -50,6 +74,16 @@ async function main() {
     `New changes detected: ${changes.length}`,
     `Total changes on file: ${merged.length}`,
   );
+
+  if (marker) {
+    lines.push(
+      `Held back as dataset upgrade (${marker.reason}): ${heldBack.length}`,
+      `  ${marker.entries.length} records were re-resolved by the pipeline, not by a government action.`,
+      "  Held back per field, so unrelated movement on those records still reports.",
+    );
+    // Consumed: the snapshot has advanced, so this never suppresses again.
+    await rm(cachePath("resolution.json"), { force: true });
+  }
 
   const byField = new Map<string, number>();
   for (const change of changes) byField.set(change.field, (byField.get(change.field) || 0) + 1);
