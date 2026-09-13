@@ -1,17 +1,25 @@
 {
   "name": "civiclens",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "setup": "pnpm install",
-    "dev": "pnpm ingest:local && next dev",
-    "build": "pnpm ingest:local && next build",
+    "dev": "next dev",
+    "dev:data": "pnpm ingest:local && pnpm enrich && pnpm changes && next dev",
+    "build": "next build",
     "serve": "pnpm build && pnpm start",
     "start": "next start",
     "lint": "next lint",
-    "ingest": "tsx scripts/ingest.ts",
-    "ingest:local": "tsx scripts/ingest-local.ts",
-    "ingest:publish": "AUTO_PUBLISH_INGESTION=true tsx scripts/ingest.ts"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/lib/geography.test.ts src/lib/changes.test.ts src/lib/enrichment.test.ts",
+    "ingest": "node --env-file-if-exists=.env.local --import tsx scripts/ingest.ts",
+    "ingest:local": "node --import tsx scripts/ingest-local.ts",
+    "ingest:publish": "AUTO_PUBLISH_INGESTION=true node --env-file-if-exists=.env.local --import tsx scripts/ingest.ts",
+    "enrich": "pnpm enrich:geography && pnpm enrich:language",
+    "enrich:geography": "node --env-file-if-exists=.env.local --import tsx scripts/enrich-geography.ts",
+    "enrich:language": "node --env-file-if-exists=.env.local --import tsx scripts/enrich-plain-language.ts",
+    "changes": "node --import tsx scripts/detect-changes.ts",
+    "pipeline": "pnpm ingest:local && pnpm changes && pnpm enrich"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

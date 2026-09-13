@@ -1,5 +1,312 @@
-import{notFound}from"next/navigation";import Link from"next/link";import{ArrowLeft,CalendarDays,CheckCircle2,ExternalLink,MapPin,ShieldCheck,Users}from"lucide-react";import{getDecision}from"@/server/decisions";import{orgNames}from"@/lib/civic";import{Timeline}from"@/features/timeline/timeline";import{DecisionCard}from"@/features/decisions/decision-card";import{AskBox}from"@/features/assistant/ask-box";
-export const dynamic="force-dynamic";
-export default async function Detail({params}:{params:Promise<{slug:string}>}){const{slug}=await params;const d=await getDecision(slug);if(!d)notFound();const date=d.importantDates[0];return <div className="shell py-8 md:py-12"><Link href="/explore" className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-extrabold text-[#08785f] hover:bg-[#e8f3ef]"><ArrowLeft size={16}/>All decisions</Link><div className="mt-7 grid gap-10 lg:grid-cols-[minmax(0,1fr)_350px]"><article><div className="flex flex-wrap items-center gap-2"><span className="eyebrow">{orgNames[d.organization]} · {d.topic}</span><span className="status" data-status={d.status}>{d.status}</span></div><h1 className="mt-4 max-w-4xl text-4xl font-black leading-[1.02] tracking-[-.055em] md:text-6xl">{d.title}</h1><p className="mt-6 max-w-3xl text-lg leading-8 text-[#5b6f6a] md:text-xl">{d.summary}</p><div className="mt-9 grid gap-3 sm:grid-cols-3"><Info icon={<Users/>} title="Who may be affected" text={d.affectedRoles.join(", ")||"Not confirmed"}/><Info icon={<MapPin/>} title="Areas involved" text={d.affectedAreas.join(", ")||"Not confirmed"}/><Info icon={<CalendarDays/>} title="Next important date" text={date?`${date.date} · ${date.label}`:"None confirmed"}/></div><Section n="01" title="Why it matters"><p>{d.whyItMatters}</p></Section><Section n="02" title="Latest official update"><div className="rounded-2xl border border-[#d7e6e0] bg-[#f4f8f6] p-5"><p>{d.latestUpdate}</p><p className="mt-4 border-t border-[#dce8e4] pt-4"><b>Next expected step:</b> {d.nextStep||"No next step confirmed."}</p></div></Section>{(d.beforeText||d.afterText)&&<Section n="03" title="Before and after"><div className="grid gap-4 md:grid-cols-2"><div className="rounded-2xl bg-slate-100 p-5"><p className="eyebrow">Before</p><p className="mt-3">{d.beforeText||"Not confirmed"}</p></div><div className="rounded-2xl bg-mint p-5"><p className="eyebrow">After</p><p className="mt-3">{d.afterText||"Not confirmed"}</p></div></div></Section>}<Section n={d.beforeText||d.afterText?"04":"03"} title="Decision timeline">{d.timeline.length?<Timeline events={d.timeline}/>:<p>No verified timeline events yet.</p>}</Section><Section n={d.beforeText||d.afterText?"05":"04"} title="Official sources"><ul className="grid gap-3">{d.sources.map(s=><li className="card group p-5" key={s.id}><a href={s.url} className="flex items-center justify-between gap-4 font-extrabold text-[#08785f]"><span>{s.title}</span><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#e8f3ef] transition-transform group-hover:-translate-y-0.5"><ExternalLink size={16}/></span></a><p className="mt-2 text-xs text-[#6b7d78]">{s.organization} · {s.pageReference||"Official record"} · {s.verificationStatus}</p></li>)}</ul></Section><div className="mt-12" id="ask"><AskBox decision={d}/></div></article><aside className="space-y-4 lg:sticky lg:top-24 lg:self-start"><DecisionCard decision={d} reason="You opened this decision"/><div className="surface p-5 text-sm"><div className="flex items-center gap-2 font-extrabold"><ShieldCheck size={17} className="text-[#08785f]"/>Source-backed tracking</div><p className="mt-3 leading-6 text-[#5b6f6a]">Last checked {d.lastCheckedAt?new Date(d.lastCheckedAt).toLocaleString():"not recorded"}. Use the linked government record for official notice.</p><p className="mt-3 flex items-center gap-1.5 text-xs font-bold text-[#08785f]"><CheckCircle2 size={14}/>Official source attached</p></div></aside></div></div>}
-function Section({n,title,children}:{n:string;title:string;children:React.ReactNode}){return <section className="mt-12 border-t border-[#dce6e2] pt-8"><div className="mb-5 flex items-center gap-3"><span className="grid h-7 w-7 place-items-center rounded-lg bg-[#e8f3ef] text-[10px] font-black text-[#08785f]">{n}</span><h2 className="text-2xl font-black tracking-[-.04em] md:text-3xl">{title}</h2></div><div className="text-[15px] leading-7 text-[#536761] md:text-base">{children}</div></section>}
-function Info({icon,title,text}:{icon:React.ReactNode;title:string;text:string}){return <div className="surface p-4"><span className="text-[#08785f]">{icon}</span><p className="mt-3 text-xs font-extrabold uppercase tracking-[.08em] text-[#6b7d78]">{title}</p><p className="mt-2 text-sm font-bold leading-5">{text}</p></div>}
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import Link from "next/link";
+import {
+  ArrowLeft,
+  CalendarDays,
+  ExternalLink,
+  Info,
+  MapPin,
+  PenLine,
+  Users,
+  Wallet,
+} from "lucide-react";
+import { getDecision } from "@/server/decisions";
+import { orgNames } from "@/lib/civic";
+import { hasCoordinates } from "@/lib/geography";
+import { Timeline } from "@/features/timeline/timeline";
+import { DecisionCard } from "@/features/decisions/decision-card";
+import { ParticipationPanel } from "@/features/decisions/participation";
+import { AskBox } from "@/features/assistant/ask-box";
+import { ProvenancePanel } from "@/components/ui/provenance";
+import { MiniMap } from "@/components/ui/map";
+import { Badge, StatusBadge } from "@/components/ui/badge";
+import { Note, Surface } from "@/components/ui/card";
+import { Stat } from "@/components/ui/stat";
+
+export const revalidate = 300;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const decision = await getDecision(slug);
+  if (!decision) return { title: "Decision not found" };
+  return {
+    title: decision.title,
+    description: decision.summary.slice(0, 300),
+  };
+}
+
+function formatMoney(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function Section({
+  n,
+  title,
+  description,
+  children,
+}: {
+  n: string;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="mt-12 border-t border-line pt-8">
+      <div className="mb-5 flex items-start gap-3">
+        <span className="mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-surface-3 text-[10px] font-black text-civic-strong">
+          {n}
+        </span>
+        <div>
+          <h2 className="display-3 text-ink">{title}</h2>
+          {description ? <p className="mt-1.5 text-sm text-muted">{description}</p> : null}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function FactTile({
+  icon,
+  title,
+  text,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  text: string;
+}) {
+  return (
+    <Surface className="p-4">
+      <span className="text-civic">{icon}</span>
+      <p className="mt-3 text-[10px] font-extrabold uppercase tracking-[0.08em] text-subtle">{title}</p>
+      <p className="mt-2 text-sm font-bold leading-5 text-ink">{text}</p>
+    </Surface>
+  );
+}
+
+export default async function DecisionPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const decision = await getDecision(slug);
+  if (!decision) notFound();
+
+  const geography = decision.geography;
+  const located = hasCoordinates(geography);
+  const nextDate = decision.importantDates[0];
+  const hasBeforeAfter = Boolean(decision.beforeText || decision.afterText);
+
+  let sectionNumber = 1;
+  const nextNumber = () => String(sectionNumber++).padStart(2, "0");
+
+  return (
+    <div className="shell py-8 md:py-12">
+      <Link
+        href="/explore"
+        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-extrabold text-civic transition-colors hover:bg-surface-3"
+      >
+        <ArrowLeft size={16} />
+        All decisions
+      </Link>
+
+      <div className="mt-7 grid gap-10 lg:grid-cols-[minmax(0,1fr)_350px]">
+        <article>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="eyebrow">
+              {orgNames[decision.organization]} · {decision.topic}
+            </span>
+            <StatusBadge status={decision.status} />
+            {decision.plainLanguageApproved ? (
+              <Badge tone="accent">
+                <PenLine size={11} />
+                Editor-reviewed
+              </Badge>
+            ) : null}
+          </div>
+
+          <h1 className="mt-4 max-w-4xl display-2 text-ink md:text-5xl">{decision.title}</h1>
+
+          <p className="mt-6 max-w-3xl reading md:text-lg">{decision.summary}</p>
+
+          {!decision.plainLanguageApproved ? (
+            <Note tone="neutral" className="mt-5 flex items-start gap-2">
+              <Info size={16} className="mt-0.5 shrink-0 text-civic" aria-hidden="true" />
+              <span className="text-muted">
+                This is the wording of the official record, not an editor-written summary. Plain-language
+                rewrites are published only after an editor approves them against the source.
+              </span>
+            </Note>
+          ) : null}
+
+          <div className="mt-9 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <FactTile
+              icon={<Users size={18} />}
+              title="Who may be affected"
+              text={decision.affectedRoles.join(", ") || "Not confirmed"}
+            />
+            <FactTile
+              icon={<MapPin size={18} />}
+              title="Where"
+              text={
+                geography?.address ??
+                geography?.neighborhood ??
+                (geography?.zipCode ? `ZIP ${geography.zipCode}` : "Not confirmed")
+              }
+            />
+            <FactTile
+              icon={<CalendarDays size={18} />}
+              title="Next important date"
+              text={nextDate ? `${nextDate.date} · ${nextDate.label}` : "None confirmed"}
+            />
+            <FactTile
+              icon={<Wallet size={18} />}
+              title="Public money"
+              text={
+                decision.money?.amountUsd
+                  ? `${formatMoney(decision.money.amountUsd)}${
+                      decision.money.fiscalYear ? ` · ${decision.money.fiscalYear}` : ""
+                    }`
+                  : "No figure stated in the record"
+              }
+            />
+          </div>
+
+          {located && geography ? (
+            <div className="mt-6">
+              <MiniMap
+                center={{ latitude: geography.latitude!, longitude: geography.longitude! }}
+                points={[
+                  {
+                    id: decision.id,
+                    latitude: geography.latitude!,
+                    longitude: geography.longitude!,
+                    label: geography.address ?? decision.title,
+                    tone: "accent",
+                    href: `/decisions/${decision.slug}`,
+                  },
+                ]}
+                activeId={decision.id}
+                height={260}
+                zoom={15}
+              />
+              <p className="mt-2 text-xs text-subtle">
+                {geography.address ? `${geography.address} · ` : ""}
+                Location matched against an official dataset. Confirm with the linked record.
+              </p>
+            </div>
+          ) : null}
+
+          <Section
+            n={nextNumber()}
+            title="Why it matters"
+            description="Written for residents, grounded in the record above."
+          >
+            <p>{decision.whyItMatters}</p>
+          </Section>
+
+          <Section n={nextNumber()} title="Latest official update">
+            <div className="rounded-[var(--radius-lg)] border border-line bg-surface-2 p-5">
+              <p className="text-ink-soft">{decision.latestUpdate}</p>
+              <p className="mt-4 border-t border-line pt-4 text-ink-soft">
+                <b className="text-ink">Next expected step:</b>{" "}
+                {decision.nextStep || "No next step confirmed in the official record."}
+              </p>
+            </div>
+          </Section>
+
+          {hasBeforeAfter ? (
+            <Section n={nextNumber()} title="Before and after">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-[var(--radius-lg)] bg-surface-3 p-5">
+                  <p className="eyebrow">Before</p>
+                  <p className="mt-3 text-ink-soft">{decision.beforeText || "Not confirmed"}</p>
+                </div>
+                <div className="rounded-[var(--radius-lg)] bg-civic/8 p-5">
+                  <p className="eyebrow">After</p>
+                  <p className="mt-3 text-ink-soft">{decision.afterText || "Not confirmed"}</p>
+                </div>
+              </div>
+            </Section>
+          ) : null}
+
+          <Section
+            n={nextNumber()}
+            title="Decision timeline"
+            description={
+              decision.timeline.length > 1
+                ? "Every action recorded in the official record, newest first."
+                : "The record currently shows a single action for this item."
+            }
+          >
+            {decision.timeline.length ? (
+              <Timeline events={decision.timeline} />
+            ) : (
+              <p className="text-muted">No verified timeline events have been recorded yet.</p>
+            )}
+          </Section>
+
+          <Section n={nextNumber()} title="Official sources">
+            {decision.sources.length ? (
+              <ul className="grid gap-3">
+                {decision.sources.map((source) => (
+                  <li className="card group p-5" key={source.id}>
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="flex items-center justify-between gap-4 font-extrabold text-civic hover:text-civic-strong"
+                    >
+                      <span className="underline decoration-civic/25 underline-offset-4">
+                        {source.title}
+                      </span>
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-surface-3 transition-transform group-hover:-translate-y-0.5">
+                        <ExternalLink size={16} />
+                      </span>
+                    </a>
+                    <p className="mt-2 text-xs text-subtle">
+                      {source.organization}
+                      {source.pageReference ? ` · ${source.pageReference}` : ""} ·{" "}
+                      {source.verificationStatus}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted">
+                No official source is attached to this record yet, so it should be treated as
+                unconfirmed.
+              </p>
+            )}
+          </Section>
+
+          <div className="mt-12" id="ask">
+            <AskBox decision={decision} />
+          </div>
+        </article>
+
+        <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+          <DecisionCard decision={decision} reason="You opened this record" />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Stat value={decision.timeline.length} label="Recorded actions" />
+            <Stat value={decision.sources.length} label="Official sources" />
+          </div>
+
+          <ParticipationPanel decision={decision} />
+          <ProvenancePanel
+            sources={decision.sources}
+            lastCheckedAt={decision.lastCheckedAt}
+            geography={geography}
+          />
+        </aside>
+      </div>
+    </div>
+  );
+}

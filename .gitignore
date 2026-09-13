@@ -28,3 +28,9 @@ dist-ssr
 *.sw?
 .vercel
 .civiclens
+
+# TypeScript incremental build output (not source)
+*.tsbuildinfo
+
+# Editor / agent workspace state
+.freebuff

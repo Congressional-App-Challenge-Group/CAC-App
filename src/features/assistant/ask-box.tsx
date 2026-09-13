@@ -39,13 +39,13 @@ export function AskBox({ decision }: { decision?: Decision }) {
 
   return (
     <div className="card overflow-hidden">
-      <div className="flex items-center gap-3 border-b border-[#e2ebe7] bg-[#f4f8f6] px-5 py-4">
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#102a26] text-emerald-300"><Bot size={20} /></span>
+      <div className="flex items-center gap-3 border-b border-line bg-surface-2 px-5 py-4">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-ink text-civic"><Bot size={20} /></span>
         <div className="flex-1">
           <h2 className="font-black tracking-[-.02em]">Ask CivicLens</h2>
-          <p className="text-xs text-[#6b7d78]">Answers are grounded in indexed official records</p>
+          <p className="text-xs text-subtle">Answers are grounded in indexed official records</p>
         </div>
-        <Sparkles size={18} className="text-[#08785f]" />
+        <Sparkles size={18} className="text-civic" />
       </div>
       <div className="p-5">
         <div className="flex flex-wrap gap-2">
@@ -60,16 +60,16 @@ export function AskBox({ decision }: { decision?: Decision }) {
           </label>
           <button className="btn btn-primary h-12 w-12 p-0" onClick={() => ask()} disabled={busy} aria-label="Send question"><Send size={18} /></button>
         </div>
-        {busy && <p className="mt-4 animate-pulse text-sm font-bold text-[#08785f]">Checking indexed records…</p>}
+        {busy && <p className="mt-4 animate-pulse text-sm font-bold text-civic">Checking indexed records…</p>}
         {error && <p className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800" role="alert">{error}</p>}
         {answer && (
-          <div className="mt-5 rounded-2xl border border-[#cee2da] bg-[#edf6f2] p-4" aria-live="polite">
-            <p className="leading-7 text-[#29443d]">{answer.text}</p>
+          <div className="mt-5 rounded-2xl border border-line-strong bg-surface-3 p-4" aria-live="polite">
+            <p className="leading-7 text-ink-soft">{answer.text}</p>
             {answer.citations.length > 0 && (
-              <ul className="mt-4 flex flex-wrap gap-2 border-t border-[#d4e6df] pt-3">
+              <ul className="mt-4 flex flex-wrap gap-2 border-t border-line pt-3">
                 {answer.citations.map((citation, index) => (
                   <li key={`${citation.url}-${index}`}>
-                    <a className="inline-flex items-center gap-1.5 rounded-full border border-[#bcd6cb] bg-white px-3 py-1.5 text-xs font-extrabold text-[#08785f] hover:bg-[#e8f3ef]" href={citation.url} target="_blank" rel="noopener noreferrer">
+                    <a className="inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-white px-3 py-1.5 text-xs font-extrabold text-civic hover:bg-surface-3" href={citation.url} target="_blank" rel="noopener noreferrer">
                       Source · {citation.title.slice(0, 60)} <ExternalLink size={12} />
                     </a>
                   </li>

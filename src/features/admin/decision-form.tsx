@@ -94,7 +94,7 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
         <b>Editor write access:</b> Saving publishes directly to the verified record and is gated by your authenticated editor role.
       </div>
       {message && (
-        <p role="status" className={`font-bold ${status === "error" ? "text-red-700" : "text-civic"}`}>
+        <p role="status" className={`font-bold ${status === "error" ? "text-danger" : "text-civic"}`}>
           {message}
         </p>
       )}

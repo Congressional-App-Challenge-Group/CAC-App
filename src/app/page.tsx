@@ -1,3 +1,20 @@
-import Link from"next/link";import{ArrowRight,CheckCircle2,Clock3,MapPinned,ShieldCheck}from"lucide-react";import{PersonalizedFeed}from"@/features/decisions/feed";
-export default function Home(){return <><section className="relative overflow-hidden border-b border-[#dce6e2] bg-[#eef5f2]"><div className="hero-grid absolute inset-0 opacity-80"/><div className="shell relative grid gap-10 py-14 md:grid-cols-[1fr_390px] md:items-center md:py-24"><div><div className="inline-flex items-center gap-2 rounded-full border border-[#bdd5cc] bg-white/70 px-3 py-1.5 text-xs font-extrabold text-[#38534c]"><span className="h-2 w-2 rounded-full bg-emerald-500"/>Official records · refreshed on every build</div><h1 className="mt-6 max-w-4xl text-[2.8rem] font-black leading-[.98] tracking-[-.06em] sm:text-6xl lg:text-7xl">Local decisions,<br/><span className="text-[#08785f]">made understandable.</span></h1><p className="mt-6 max-w-2xl text-lg leading-8 text-[#4d625c] md:text-xl">Follow the policies, votes, and public actions shaping Charlotte and Mecklenburg—without digging through meeting packets.</p><div className="mt-8 flex flex-wrap gap-3"><Link className="btn btn-primary px-5" href="/explore">Explore active decisions <ArrowRight size={18}/></Link><Link className="btn btn-secondary px-5" href="/onboarding">Personalize my brief</Link></div><div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-xs font-bold text-[#5b6f6a]"><span className="flex items-center gap-1.5"><ShieldCheck size={15} className="text-[#08785f]"/>Official sources</span><span className="flex items-center gap-1.5"><Clock3 size={15} className="text-[#08785f]"/>Clear timelines</span><span className="flex items-center gap-1.5"><MapPinned size={15} className="text-[#08785f]"/>Local relevance</span></div></div><aside className="card overflow-hidden p-2"><div className="rounded-[17px] bg-[#102a26] p-6 text-white"><p className="text-xs font-extrabold uppercase tracking-[.15em] text-emerald-300">How CivicLens works</p><h2 className="mt-3 text-2xl font-black tracking-[-.035em]">Signal, not document noise.</h2><ol className="mt-6 space-y-5 text-sm"><Step n="01" title="Monitor" text="We check official meeting records."/><Step n="02" title="Organize" text="Actions become stages and timelines."/><Step n="03" title="Connect" text="You see what matters to your area."/></ol><div className="mt-6 flex items-center gap-2 border-t border-white/15 pt-5 text-xs text-emerald-100"><CheckCircle2 size={16}/>Every tracked item links to its source.</div></div></aside></div></section><div className="shell py-14 md:py-20"><PersonalizedFeed/></div></>}
-function Step({n,title,text}:{n:string;title:string;text:string}){return <li className="grid grid-cols-[34px_1fr] gap-3"><span className="grid h-8 w-8 place-items-center rounded-lg bg-white/10 text-[10px] font-black text-emerald-300">{n}</span><div><p className="font-extrabold">{title}</p><p className="mt-1 text-white/60">{text}</p></div></li>}
+import { Brief } from "@/features/brief/brief";
+import { Masthead } from "@/features/brief/masthead";
+import { getRecentChanges } from "@/server/decisions";
+
+export default async function Home() {
+  const changes = await getRecentChanges({ limit: 60 });
+  const weekAgo = Date.now() - 7 * 86_400_000;
+  const changedThisWeek = changes.filter(
+    (change) => new Date(change.changedAt).getTime() >= weekAgo,
+  ).length;
+
+  return (
+    <>
+      <Masthead changedThisWeek={changedThisWeek} />
+      <div className="shell py-12 md:py-16">
+        <Brief changes={changes} />
+      </div>
+    </>
+  );
+}
