@@ -1,6 +1,7 @@
 import type { Decision, DecisionDraft, DraftField, DraftedFields } from "@/types";
 import { orgNames } from "@/lib/civic";
 import { extractAddressFromText, extractZipFromText, parsePetitionNumber } from "@/lib/geography";
+import { dateOnly, daysUntil, nextDeadline } from "@/lib/deadlines";
 
 /**
  * Plain-language generation.
@@ -14,7 +15,11 @@ import { extractAddressFromText, extractZipFromText, parsePetitionNumber } from 
  * the draft's status to "approved".
  */
 
-export const PROMPT_VERSION = "civiclens-plain-language-v1";
+// v2: the summary now carries the subject a title states after its own separator
+// ("a contract for the Sam Billings Center project") instead of naming only the
+// instrument ("a contract"). The version is what makes the drafting job produce a
+// fresh set of drafts rather than quietly keeping the older, emptier wording.
+export const PROMPT_VERSION = "civiclens-plain-language-v2";
 
 export const draftFieldLabels: Record<DraftField, string> = {
   summary: "Plain-language summary",
@@ -104,7 +109,7 @@ const IMPACT_BY_TOPIC: Record<string, string> = {
   "Development and rezoning":
     "Rezoning decides what may be built on one specific site — housing, shops or offices — and at what density. A change can affect neighbouring property, traffic, tree cover and school capacity, which is why these petitions draw public comment before a vote.",
   "Government budgets":
-    "Budget and contract items decide where public money goes and which services are actually funded. They rarely attract attention but they set what the city and county are able to deliver.",
+    "Budget and contract items decide where public money goes and which services are actually funded. They rarely attract attention, but they set what the local government is able to deliver.",
   Roads:
     "Road items change how people move through an area — lanes, sidewalks, intersections and crossings. They affect commute times and safety for everyone who uses the corridor.",
   "Public transit":
@@ -148,36 +153,487 @@ function placePhrase(decision: Decision): string {
   return "";
 }
 
-export function draftSummary(decision: Decision): string {
-  const petition = parsePetitionNumber(decision.title);
-  const applicant = applicantFromTitle(decision.title);
-  const record = orgNames[decision.organization];
-  const body = cleanRecordText(decision.summary);
-  const bodyAddsInfo = !isTitleDuplicate(body, decision.title) && body.length > 40;
+/**
+ * The kind of instrument a title names, in words a resident uses.
+ *
+ * This exists because the catalog is dominated by instruments whose *titles* are
+ * the only statement of what they are: 123 budget amendments, 178 contract and
+ * service items, 108 "Approval of …" items. Those titles average 72 characters
+ * and 219 of them run past 120. Saying "A budget amendment before Mecklenburg
+ * County" tells a resident more than the words "Budget Ordinance Amendment No.
+ * 27BCC018 Increasing Both" do, and it says nothing the title does not.
+ *
+ * Ordered most specific first, because "Budget Ordinance Amendment" also matches
+ * "ordinance" and "amendment".
+ */
+const INSTRUMENTS: Array<{
+  test: RegExp;
+  noun: string;
+  /** Preposition joining the noun to a subject taken from after the separator. */
+  connector?: string;
+  /** Set only on patterns that capture their own subject, which brings its own grammar. */
+  about?: (m: RegExpMatchArray) => string;
+  /** Preferred noun when the captured subject turns out to be a verb phrase. */
+  nounWhenVerb?: string;
+}> = [
+  {
+    test: /^rezoning petition:?\s*([\w-]+)\s+by\s+(.+)$/i,
+    noun: "A rezoning petition",
+    about: (m) => `numbered ${m[1]}, filed by ${stripTrailingPunctuation(m[2])}`,
+  },
+  // The leading-verb patterns come first, because they capture the whole rest of
+  // the title as their subject. Ordering them after the instrument nouns (as this
+  // list originally did) meant the *longest* titles got the emptiest summaries:
+  // "Approval of Budget Ordinance Amendment No.27BCC018 Increasing Both the
+  // Expenditures and Revenues of the Shoppes of Hope Valley Fund Center by
+  // $365,000 …" was matched by the words "budget ordinance amendment" and reduced
+  // to "a budget ordinance amendment.", losing every figure in it.
+  { test: /^approval to\s+(.+)$/i, noun: "A request to", about: (m) => m[1] },
+  // "Approve Execution of Construction Contract" is a noun phrase and reads as
+  // "An approval request for execution of …", while "Approve and Authorize the
+  // Manager" is a verb phrase and reads as "A request to authorize the Manager" —
+  // the same opening word, so the noun is chosen after the subject is read.
+  {
+    test: /^approval (?:of|for)\s+(.+)$/i,
+    noun: "An approval request for",
+    nounWhenVerb: "A request to",
+    about: (m) => m[1],
+  },
+  {
+    test: /^approve(?: and)?\s+(.+)$/i,
+    noun: "An approval request for",
+    nounWhenVerb: "A request to",
+    about: (m) => m[1],
+  },
+  { test: /^authori[sz]e\s+(?:the\s+)?(.+)$/i, noun: "A request to authorise", about: (m) => m[1] },
+  { test: /^authori[sz]ation of\s+(.+)$/i, noun: "An authorisation for", about: (m) => m[1] },
+  { test: /^adoption of\s+(.+)$/i, noun: "A request to adopt", about: (m) => m[1] },
+  { test: /^adopt\s+(?:the\s+)?(.+)$/i, noun: "A request to adopt", about: (m) => m[1] },
+  { test: /^suspend the rules\s*(?:and)?\s*(.+)$/i, noun: "A request to", about: (m) => m[1] },
+  { test: /^the (?:board|commission|council) is (?:requested|asked) to\s+(.+)$/i, noun: "A request to", about: (m) => m[1] },
+  { test: /^decline\s+(.+)$/i, noun: "A request to decline", about: (m) => m[1] },
+  // Must precede the bare "ordinance" noun, or "Amend the County's Fire Marshals'
+  // Fire Prevention Ordinance" is read as an ordinance about the words
+  // "Amend the County's Fire Marshals' Fire Prevention".
+  { test: /^amend\s+(?:the\s+)?(.+)$/i, noun: "A request to amend", about: (m) => m[1] },
+  // Now the instrument nouns, most specific first: "Budget Ordinance Amendment"
+  // also matches "ordinance" and "amendment".
+  { test: /^set a public hearing/i, noun: "A request to set a public hearing" },
+  { test: /^public hearings?\b/i, noun: "A public hearing", connector: "on" },
+  // Note the absence of `about`: capturing the tail here made the pattern's own
+  // grammar win, and the summary printed "a policy referral Legislation on
+  // Quality of Life" — the connector is what joins the noun to the subject, so the
+  // subject has to arrive by the same route as every other separator subject.
+  { test: /^policy referral\b/i, noun: "A policy referral", connector: "on" },
+  { test: /capital project amendment/i, noun: "A capital project amendment", connector: "to" },
+  { test: /budget ordinance amendment/i, noun: "A budget ordinance amendment", connector: "to" },
+  { test: /budget amendment/i, noun: "A budget amendment", connector: "to" },
+  // "Ordinance Amendment" must precede "Ordinance", or the head of a grant project
+  // ordinance amendment is summarised as an ordinance about the words "Grant Project".
+  { test: /ordinance amendment/i, noun: "An ordinance amendment", connector: "to" },
+  { test: /construction contract|\bcontract\b|\bRFP\b/i, noun: "A contract", connector: "for" },
+  // "Resolution" precedes "agreement" because a title can name both, and the
+  // resolution is the instrument: "County Resolution Termination of Transit
+  // Agreement" was summarised as "an agreement with County Resolution
+  // Termination of Transit".
+  { test: /\bresolutions?\b/i, noun: "A resolution", connector: "on" },
+  // Plural matters here: "Municipal Agreements for Asset Maintenance" fell
+  // through to the topic fallback and was summarised as "a roads item".
+  { test: /interlocal agreement|\bagreements?\b/i, noun: "An agreement", connector: "with" },
+  { test: /^donations? of\s+(.+)$/i, noun: "A donation of", about: (m) => m[1] },
+  { test: /^nominations? to/i, noun: "A nomination to a board or commission", connector: "to" },
+  { test: /\bgrant\b/i, noun: "A grant award", connector: "for" },
+  { test: /\blease\b/i, noun: "A lease", connector: "at" },
+  { test: /\bordinance\b/i, noun: "An ordinance", connector: "on" },
+  { test: /\bpolicy\b|\bplan\b/i, noun: "A policy or plan", connector: "on" },
+];
 
+/**
+ * Instruments a title puts at its *end*, with the subject before them.
+ *
+ * Only consulted when nothing above matched: "Affordable Housing Funding
+ * Recommendation", "Tax Collector's Settlement Report for Fiscal Year 2026",
+ * "City Manager's Proposed FY 2027 Budget Presentation". These were the last
+ * sizeable block still falling back to "a local government item".
+ */
+const TRAILING_NOUNS: Array<{ test: RegExp; noun: string; connector: string }> = [
+  { test: /\brecommendations?\b/i, noun: "A recommendation", connector: "on" },
+  { test: /\brequests?\b/i, noun: "A request", connector: "for" },
+  { test: /\bpresentations?\b/i, noun: "A presentation", connector: "on" },
+  { test: /\boverview\b/i, noun: "An overview", connector: "of" },
+  { test: /\bproposals?\b/i, noun: "A proposal", connector: "on" },
+  { test: /\bupdates?\b/i, noun: "An update", connector: "on" },
+  { test: /\b(?:discussion|presentation)\b/i, noun: "A discussion", connector: "on" },
+  { test: /\b(?:report|study|review|evaluation|assessment)s?\b/i, noun: "A review", connector: "of" },
+];
+
+/** A captured subject keeps its own terminal punctuation, so the full stop is not doubled. */
+function stripTrailingPunctuation(value: string): string {
+  return value.replace(/[.;,\s]+$/, "").trim();
+}
+
+/**
+ * A subject cut at its own clause boundary, so it does not stop mid-phrase.
+ *
+ * Titles state their subject as a list of clauses — "… Increasing Both the
+ * Expenditures and Revenues of the Shoppes of Hope Valley Fund Center by
+ * $365,000 to Align the County Budget …" — so a hard character cut lands in the
+ * middle of one. Cutting back to the last comma or semicolon yields a readable
+ * fragment; only when there is no such boundary does it fall back to the last
+ * whole word.
+ */
+function subjectExcerpt(value: string, max = 130): string {
+  // A separator inside the subject is another title clause, not a hyphenated
+  // word, so it becomes a comma: "No. 26BCC073 - Transferring $117,630.96 …"
+  // reads as "No. 26BCC073, Transferring $117,630.96 …".
+  const text = cleanRecordText(value).replace(/\s+[-\u2013\u2014]\s+/g, ", ");
+  if (text.length <= max) return text;
+  const window = text.slice(0, max);
+  const boundary = Math.max(window.lastIndexOf(", "), window.lastIndexOf("; "), window.lastIndexOf(" \u2014 "));
+  if (boundary >= max * 0.45) return `${window.slice(0, boundary).replace(/[\s,;]+$/, "")}\u2026`;
+  return `${window.replace(/\s+\S*$/, "")}\u2026`;
+}
+
+/**
+ * The noun for the part of a title before its own separator.
+ *
+ * Only reached when no leading pattern matched, so the heads here are the ones
+ * the patterns do not name: "Subcontractor Pre-qualifications - Construction
+ * Manager @ Risk for 7th & College Street Parking" had been reduced to "a
+ * government budgets item", which describes the filing cabinet rather than the
+ * item.
+ */
+const HEAD_NOUNS: Array<{ test: RegExp; noun: string; connector: string }> = [
+  { test: /subcontractor|pre-?qualification/i, noun: "A subcontractor pre-qualification", connector: "for" },
+  { test: /appointment/i, noun: "An appointment", connector: "to" },
+  { test: /proclamation/i, noun: "A proclamation", connector: "on" },
+  { test: /transaction/i, noun: "A property transaction", connector: "at" },
+  { test: /assessment/i, noun: "An assessment", connector: "of" },
+  { test: /agreement/i, noun: "An agreement", connector: "with" },
+  { test: /ordinance/i, noun: "An ordinance", connector: "on" },
+  { test: /amendment/i, noun: "An amendment", connector: "to" },
+  { test: /resolution/i, noun: "A resolution", connector: "on" },
+  { test: /lease/i, noun: "A lease", connector: "at" },
+  { test: /contract|bid/i, noun: "A contract", connector: "for" },
+  { test: /grant|funding|budget/i, noun: "A funding item", connector: "on" },
+  { test: /plan|policy|study|review|reappraisal/i, noun: "A plan or review", connector: "on" },
+];
+
+/**
+ * Splits a title at its own separator, when the head names an instrument.
+ *
+ * Legistar, Granicus and the county's own publisher all write an item as
+ * `<instrument> - <subject>`: 289 of the 763 indexed titles have that shape, and
+ * 281 of them carry a substantive subject in the tail. Dropping it is what made
+ * the first round of drafts read as "Before Mecklenburg County: a construction
+ * contract." — true, and useless. The subject is the only part of the title a
+ * resident cannot guess from the instrument, so it is the part worth keeping.
+ */
+function splitOnSeparator(title: string): { head: string; tail: string } | null {
+  const t = cleanRecordText(title);
+  const match = t.match(/^(.{3,60}?)\s*[-\u2013\u2014:]\s+(.{12,})$/);
+  if (!match) return null;
+  const tail = stripTrailingPunctuation(match[2]);
+  return tail.length >= 12 ? { head: match[1], tail } : null;
+}
+
+/**
+ * How a subject attaches to its instrument noun.
+ *
+ * - `own` — a captured subject that brings its own grammar ("numbered 2025-011,
+ *   filed by …"); joins with a space, exactly as captured.
+ * - `direct` — the subject opens with its own verb or preposition ("to support
+ *   …", "Adopting the Durham Strategic Framework", "of intent to abandon …");
+ *   joins with a space and the first word is lower-cased.
+ * - `reference` — the subject opens with a case reference ("No. 27BCC022",
+ *   "27BCC021"); joins after a comma, because that is how an appositive reads.
+ * - `connector` — a bare noun phrase, which needs the instrument's preposition.
+ */
+type SubjectJoin = "own" | "direct" | "reference" | "connector";
+
+export type InstrumentPhrase = {
+  noun: string;
+  connector?: string;
+  subject?: string;
+  join?: SubjectJoin;
+};
+
+/** Prepositions that already govern whatever follows them. */
+const SELF_GOVERNING = /^(?:to|for|of|on|by|with|under|via|and|or|as|in)\b/i;
+
+/**
+ * Verbs a title uses after its instrument in place of a preposition.
+ *
+ * Matched against whole words with an inflection test rather than as prefixes.
+ * The prefix form was wrong in a way that showed up immediately: "support"
+ * matched the *adjective* "Supportive", so "Proclamation - Supportive Housing
+ * Week" was read as a verb phrase and printed "a proclamation Supportive Housing
+ * Week" — no joiner and, because the lower-casing step strips a trailing
+ * parenthetical, a title that had lost its own "(5min)".
+ */
+const SWALLOWED_VERBS = new Set([
+  "adopt", "approve", "support", "recognize", "accept", "amend", "authorize", "request", "declare",
+  "honor", "award", "enter", "establish", "extend", "revise", "rename", "designate", "convey",
+  "lease", "purchase", "sell", "create", "set", "suspend", "ratify", "confirm", "fund", "relate",
+  "increase", "reduce", "allocate", "redirect", "transfer", "close", "renovate", "construct",
+  "replace", "improve", "provide", "implement", "update", "expand", "modify", "adjust", "recommend",
+  "report", "present", "discuss", "review", "consider", "submit", "record", "grant", "assign",
+  "appoint", "elect", "acquire", "dispose", "demolish", "install", "maintain", "operate", "partner",
+  "join", "participate", "appropriate", "plan", "develop", "receive", "execute", "award", "advertise",
+  "conduct", "negotiate", "settle", "direct", "permit", "allow", "require", "prohibit", "restrict",
+]);
+
+/** True when the subject opens with a verb (in any of the forms titles use). */
+function opensWithVerb(subject: string): boolean {
+  const first = subject.match(/^[A-Za-z']+/)?.[0]?.toLowerCase();
+  if (!first) return false;
+  if (SWALLOWED_VERBS.has(first)) return true;
+  for (const suffix of ["ing", "es", "ed", "s", "d"]) {
+    if (!first.endsWith(suffix)) continue;
+    const stem = first.slice(0, -suffix.length);
+    // "planning" keeps its consonant, so a doubled final letter is tried too.
+    if (SWALLOWED_VERBS.has(stem) || SWALLOWED_VERBS.has(`${stem}e`) || SWALLOWED_VERBS.has(stem.slice(0, -1))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Case references, which attach to the instrument as an appositive.
+ *
+ * Deliberately narrower than "starts with a digit": a street number also starts
+ * with a digit, and treating it as a reference turned "Airport Facility Lease -
+ * 4821 Express Drive" into "a lease, 4821 Express Drive" instead of "a lease at
+ * 4821 Express Drive".
+ */
+const CASE_REFERENCE =
+  /^(?:no\.?\s*\S+|#\s*\S+|\d[\w-]*\s+by\b|\d{4}-\d{3,}\b|\d{2,}[A-Z]{2,}\d*\b)/i;
+
+/** Chooses the joiner from the subject's own opening words. */
+function classifySubject(subject: string): SubjectJoin {
+  if (CASE_REFERENCE.test(subject)) return "reference";
+  if (SELF_GOVERNING.test(subject) || opensWithVerb(subject)) return "direct";
+  return "connector";
+}
+
+/**
+ * Lower-cases only the first letter.
+ *
+ * `lowerFirst` is the wrong tool for a subject: it strips a trailing
+ * parenthetical (a meeting duration is part of the title, not noise) and it
+ * declines to lower-case anything that looks like a proper noun, which is what
+ * left "a resolution Honoring Civil Rights Icon Dr. Virginia Williams" with a
+ * capital mid-sentence.
+ */
+function lowerFirstLetter(value: string): string {
+  if (!value) return value;
+  // A preposition is followed by ordinary words, so "to Amend the County's …"
+  // becomes "to amend the County's …"; a proper noun is left alone.
+  const afterPreposition = value.match(/^(to|for|of|on|by|with|under|via|in|and|or|as)\s+(\S+)/i);
+  if (afterPreposition && /^[A-Z][a-z]{2,}$/.test(afterPreposition[2])) {
+    const rest = value.slice(afterPreposition[0].length);
+    return `${afterPreposition[1]} ${lowerFirstLetter(afterPreposition[2])}${rest}`;
+  }
+  return value.charAt(0).toLowerCase() + value.slice(1);
+}
+
+/**
+ * The instrument a title names, with whatever subject the title states for it.
+ *
+ * A title states its subject in one of four places, and each has to be looked
+ * for in turn, because missing one is how a summary ends up saying nothing:
+ *
+ *  1. captured by the leading-verb pattern itself ("Approval of …");
+ *  2. after the title's own separator ("Construction Contract - Valerie C.
+ *     Woodard Center Deep Energy Retrofit Project");
+ *  3. directly after the instrument with no separator at all ("Budget Ordinance
+ *     Amendment No. 27BCC022 to recognize $171,408 …");
+ *  4. *before* an instrument that sits at the end ("Criminal History and Motor
+ *     Vehicle Record Checks Ordinance").
+ *
+ * Whatever the source, a subject is only used when it is long enough to be one.
+ */
+export function instrumentFor(title: string): InstrumentPhrase | null {
+  const t = cleanRecordText(title);
+
+  for (const pattern of INSTRUMENTS) {
+    const match = t.match(pattern.test);
+    if (!match || match.index === undefined) continue;
+
+    if (pattern.about && match.length > 1) {
+      const raw = stripTrailingPunctuation(pattern.about(match));
+      const captured = subjectExcerpt(raw);
+      if (captured.length < 12) return { noun: pattern.noun, connector: pattern.connector };
+      const asVerb = pattern.nounWhenVerb && opensWithVerb(raw);
+      return asVerb
+        ? { noun: pattern.nounWhenVerb as string, subject: lowerFirstLetter(captured), join: "own" }
+        : { noun: pattern.noun, subject: lowerFirst(captured), join: "own" };
+    }
+
+    const after = subjectExcerpt(stripTrailingPunctuation(t.slice(match.index + match[0].length)));
+
+    // A case reference belongs with the instrument, and any separator after it is
+    // ordinary punctuation, so this is read before the separator split: "Budget
+    // Ordinance Amendment No. 26BCC073 - Transferring $117,630.96 …".
+    if (after.length >= 12 && classifySubject(after) === "reference") {
+      return { noun: pattern.noun, connector: pattern.connector, subject: after, join: "reference" };
+    }
+
+    const split = splitOnSeparator(t);
+    if (split) {
+      const tail = subjectExcerpt(split.tail);
+      return { noun: pattern.noun, connector: pattern.connector, subject: tail, join: classifySubject(tail) };
+    }
+
+    // A tail that opens with a conjunction is the rest of a list whose first half
+    // sits before the instrument — "WomenNC CEDAW Resolution and Student Research
+    // Presentation" — so the words *before* it are the subject.
+    if (after.length >= 12 && !/^(?:and|or|,|;)/i.test(after)) {
+      return { noun: pattern.noun, connector: pattern.connector, subject: after, join: classifySubject(after) };
+    }
+
+    // Otherwise the instrument sits at the end, so the words before it are the subject.
+    const before = subjectExcerpt(stripTrailingPunctuation(t.slice(0, match.index)));
+    if (before.length >= 12) {
+      return { noun: pattern.noun, connector: pattern.connector, subject: before, join: classifySubject(before) };
+    }
+
+    return { noun: pattern.noun, connector: pattern.connector };
+  }
+
+  // No leading pattern matched: name the instrument from the head of the title's
+  // own separator and keep the tail as the subject.
+  const split = splitOnSeparator(t);
+  if (split) {
+    const head = HEAD_NOUNS.find((entry) => entry.test.test(split.head));
+    if (head) {
+      const subject = subjectExcerpt(split.tail);
+      return { noun: head.noun, connector: head.connector, subject, join: classifySubject(subject) };
+    }
+  }
+
+  // Finally, a title that ends with its instrument.
+  for (const trailing of TRAILING_NOUNS) {
+    const match = t.match(trailing.test);
+    if (!match || match.index === undefined) continue;
+    const subject = subjectExcerpt(stripTrailingPunctuation(t.slice(0, match.index)));
+    if (subject.length >= 12) {
+      return { noun: trailing.noun, connector: trailing.connector, subject, join: classifySubject(subject) };
+    }
+  }
+
+  return null;
+}
+
+/** Attaches a subject to an instrument noun, according to how the subject opens. */
+export function joinInstrument(phrase: InstrumentPhrase): string {
+  const noun = lowerFirst(phrase.noun);
+  const subject = phrase.subject;
+  if (!subject) return noun;
+  switch (phrase.join ?? "connector") {
+    case "own":
+      return `${noun} ${subject}`;
+    case "direct":
+      return `${noun} ${lowerFirstLetter(subject)}`;
+    case "reference":
+      return `${noun}, ${subject}`;
+    default:
+      return `${noun} ${phrase.connector ?? "on"} ${subject}`;
+  }
+}
+
+/** "An education item", not "A education item". */
+function indefinite(word: string): string {
+  return /^[aeiou]/i.test(word.trim()) ? "An" : "A";
+}
+
+/** "The FY2027 budget" reads better mid-sentence than "The FY2027 budget". */
+function lowerFirst(value: string): string {
+  const cleaned = value.replace(/\s*\([^)]*\)\s*$/, "").replace(/[.;,]+$/, "").trim();
+  if (!cleaned) return cleaned;
+  // Leave a phrase that opens with a proper noun alone: "Budget Ordinance
+  // Amendment" must not become "budget Ordinance Amendment", and the first word
+  // may be hyphenated or possessive ("Self-Contained …", "County's …") — the
+  // earlier test allowed only letters, which turned "Self-Contained Breathing
+  // Apparatus" into "self-Contained Breathing Apparatus".",
+  if (/^[A-Z]{2,}\b/.test(cleaned) || /^[A-Z][\w'-]*\s+[A-Z]/.test(cleaned)) return cleaned;
+  return cleaned.charAt(0).toLowerCase() + cleaned.slice(1);
+}
+
+/**
+ * A plain-language summary that names the instrument and the body, and stops.
+ *
+ * The page already prints the record's exact wording as its heading, so this is
+ * not a rewrite of the title and must not pretend to be: it classifies the thing
+ * and reports where it stands, using the title's own words for the subject. What
+ * it never does is paraphrase the *contents* of a legal instrument, because that
+ * is precisely where a summary starts inventing what a document says.
+ */
+export function draftSummary(decision: Decision): string {
+  const record = orgNames[decision.organization];
+  const bodyText = cleanRecordText(decision.summary);
+  const bodyAddsInfo = !isTitleDuplicate(bodyText, decision.title) && bodyText.length > 40;
+  const instrument = instrumentFor(decision.title);
+
+  /*
+   * The body leads, and the instrument follows.
+   *
+   * Building it the other way round produced run-ons that lost their grammar as
+   * soon as the subject was long — "A rezoning petition numbered 2025-011, filed
+   * by Garrison Road Holdings, LLC before Charlotte" — because the subject clause
+   * has no terminal punctuation of its own. Putting the body first in its own
+   * clause keeps the sentence correct whatever the subject's length.
+   */
   let lead: string;
-  if (petition && /rezon/i.test(decision.title)) {
-    lead = `Rezoning petition ${petition}${
-      applicant ? `, filed by ${applicant},` : ""
-    } asks ${record} to change how one specific site may be used.`;
+  if (instrument) {
+    lead = `Before ${record}: ${joinInstrument(instrument)}.`;
   } else {
-    lead = `This is a ${decision.topic.toLowerCase()} item before ${record}.`;
+    // No instrument could be named from the title, so the summary states the
+    // topic and the body and claims nothing about the subject at all.
+    lead = `${indefinite(decision.topic)} ${decision.topic.toLowerCase()} item before ${record}.`;
   }
 
   const state =
     decision.approvedAt && ["Approved", "Rejected", "Completed"].includes(decision.status)
-      ? `The indexed official record shows it as ${decision.status.toLowerCase()}, with action recorded on ${decision.approvedAt.slice(0, 10)}.`
-      : `The indexed official record currently shows it as ${decision.status.toLowerCase()}.`;
+      ? `The indexed record shows it as ${decision.status.toLowerCase()}, with the action recorded on ${decision.approvedAt.slice(0, 10)}.`
+      : `The indexed record currently shows it as ${decision.status.toLowerCase()}.`;
 
-  const detail = bodyAddsInfo ? ` The record states: “${excerpt(body, 300)}”` : "";
+  const detail = bodyAddsInfo ? ` The record states: “${excerpt(bodyText, 300)}”` : "";
 
   return `${lead} ${state}${detail}`;
 }
 
-export function draftNextStep(decision: Decision): string | null {
+/**
+ * The next dated step, or nothing at all.
+ *
+ * This previously returned `importantDates[0]` unconditionally, which for a
+ * decided matter produced "Approved — 2026-09-14" and for a stale one "Under
+ * review — 2025-10-21" — restatements of a stage and a date already past, printed
+ * under a heading that reads "Next expected step". A resident reading that is
+ * told a decision already taken is the next thing to happen.
+ *
+ * A next step now requires a date still ahead of the reader. Where there is none
+ * the draft is withheld, and the page says the record confirms no next step
+ * rather than filling the gap with the past.
+ */
+export function draftNextStep(decision: Decision, now: Date = new Date()): string | null {
   if (decision.nextStep) return decision.nextStep;
-  const date = decision.importantDates[0];
-  if (date) return `${date.label} — ${date.date}.`;
+
+  const deadline = nextDeadline(decision, now);
+  const day = deadline?.date ? dateOnly(deadline.date) : null;
+  if (day && daysUntil(day, now) >= 0) {
+    return `Next dated action on the record: ${day}${
+      deadline?.officialStatus ? ` — the register lists it as “${deadline.officialStatus}”` : ""
+    }.`;
+  }
+
+  const upcoming = decision.importantDates.find((entry) => {
+    const entryDay = dateOnly(entry.date);
+    return Boolean(entryDay && daysUntil(entryDay, now) >= 0);
+  });
+  if (upcoming) return `${upcoming.label || "Dated step on the record"} — ${upcoming.date}.`;
+
   return null;
 }
 
@@ -338,6 +794,29 @@ export async function generateDrafts(
 /* Applying approved drafts                                                    */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * True when a summary is only scaffolding around the filing category.
+ *
+ * "Before Durham County: a public hearing." states the category and the status
+ * and nothing else, so a reader learns no more than the title told them — which
+ * makes it a restatement rather than the rewrite the product promises. A summary
+ * that quotes the record carries real content even without a named subject, so it
+ * escapes the rule.
+ *
+ * Lives here rather than in the approval job because it is a property of the
+ * drafting, and the job is only where it gets enforced.
+ */
+export function summaryIsScaffolding(text: string): boolean {
+  if (/\bThe record states:/i.test(text)) return false;
+  const body = text
+    .split(/\bThe record states:/i)[0]
+    .replace(/^Before [^:]+:\s*/i, "")
+    .replace(/^A(?:n)? [a-z ]+ item before [^.]+?\.\s*/i, "")
+    .replace(/\s*The indexed record (?:currently )?shows it as [^.]+\.\s*/i, " ")
+    .trim();
+  return body.split(/\s+/).filter(Boolean).length <= 4;
+}
+
 /** Fields on a decision that a draft is allowed to replace. */
 export function applyApprovedDrafts(
   decision: Decision,
@@ -356,7 +835,12 @@ export function applyApprovedDrafts(
     nextStep: applied.nextStep ?? decision.nextStep,
     beforeText: applied.beforeText ?? decision.beforeText,
     afterText: applied.afterText ?? decision.afterText,
-    plainLanguageApproved: true,
+    // The flag drives an "Editor-reviewed" badge and suppresses the notice that
+    // the wording is the record's own. Both are claims about the *summary*, so an
+    // approved "why it matters" alone must not raise it: 69 records have a
+    // reviewable why-it-matters and no reviewable summary, and those pages still
+    // print the official wording.
+    plainLanguageApproved: Boolean(applied.summary),
   };
 }
 

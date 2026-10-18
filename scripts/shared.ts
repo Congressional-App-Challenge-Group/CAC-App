@@ -14,10 +14,13 @@ export async function readJson<T>(file: string): Promise<T | null> {
   }
 }
 
-export async function writeJson(file: string, value: unknown): Promise<string> {
+export async function writeJson(file: string, value: unknown, indent = 2): Promise<string> {
   const target = cachePath(file);
   await mkdir(dirname(target), { recursive: true });
-  await writeFile(target, JSON.stringify(value, null, 2));
+  // Indentation stays on by default because these files are read and reviewed by
+  // hand. Boundary geometry is the exception: pretty-printing nested coordinate
+  // pairs puts every number on its own line and triples the file.
+  await writeFile(target, JSON.stringify(value, null, indent));
   return target;
 }
 

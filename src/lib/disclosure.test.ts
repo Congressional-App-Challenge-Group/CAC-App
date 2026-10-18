@@ -1,7 +1,39 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildDisclosureReport, gapPercent, MONEY_TOPICS } from "./disclosure";
+import { buildDisclosureReport, gapPercent, headlineGap, MONEY_TOPICS } from "./disclosure";
 import type { Decision } from "@/types";
+
+test("the language gap counts records with no approved rewrite, and is marked as ours", () => {
+  const report = buildDisclosureReport([
+    decision({ id: "a", plainLanguageApproved: true }),
+    decision({ id: "b" }),
+    decision({ id: "c" }),
+  ]);
+  const language = report.gaps.find((gap) => gap.key === "language");
+  assert.equal(language?.missing, 2);
+  assert.equal(language?.total, 3);
+  assert.equal(language?.ours, true);
+  assert.equal(gapPercent(language!), 67);
+});
+
+test("the headline names a publishing omission, never our own gap or our data limit", () => {
+  // Affected groups are absent from every source agenda, so that meter is a limit
+  // of the index; the language meter is one CivicLens answers. Neither may be
+  // quoted as the government's headline omission.
+  const report = buildDisclosureReport([
+    decision({ geography: { method: "none" } as Decision["geography"] }),
+  ]);
+  const headline = headlineGap(report);
+  assert.equal(headline?.key, "location");
+  assert.ok(report.gaps.find((gap) => gap.key === "affected")?.limit);
+  assert.ok(report.gaps.find((gap) => gap.key === "language")?.ours);
+});
+
+test("a record with a source is not counted as having no official link", () => {
+  const report = buildDisclosureReport([decision()]);
+  const source = report.gaps.find((gap) => gap.key === "source");
+  assert.equal(source?.missing, 0);
+});
 
 function decision(overrides: Partial<Decision> = {}): Decision {
   return {

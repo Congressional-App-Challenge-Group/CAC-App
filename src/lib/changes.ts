@@ -30,8 +30,21 @@ export type SnapshotEntry = {
 
 export type Snapshot = {
   capturedAt: string;
+  /**
+   * Which record model produced this snapshot.
+   *
+   * A snapshot taken before the matter collapse holds one entry per agenda
+   * appearance; the same government activity afterwards holds one entry per
+   * matter. Diffing across that boundary reports the restructuring itself as
+   * dozens of timeline changes, which is not movement — so a snapshot from a
+   * different model is treated as a new baseline instead.
+   */
+  model?: string;
   entries: SnapshotEntry[];
 };
+
+/** Bump this whenever the shape or identity of a tracked record changes. */
+export const SNAPSHOT_MODEL = "matters-v1";
 
 const COMPARABLE_FIELDS: ChangeField[] = [
   "status",
@@ -80,7 +93,7 @@ export function toSnapshotEntry(decision: Decision): SnapshotEntry {
 }
 
 export function toSnapshot(decisions: Decision[], capturedAt = new Date().toISOString()): Snapshot {
-  return { capturedAt, entries: decisions.map(toSnapshotEntry) };
+  return { capturedAt, model: SNAPSHOT_MODEL, entries: decisions.map(toSnapshotEntry) };
 }
 
 export type DiffOptions = {

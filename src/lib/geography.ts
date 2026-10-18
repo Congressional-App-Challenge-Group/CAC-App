@@ -18,9 +18,6 @@ export type GeoRecord = {
   latitude: number;
   longitude: number;
   zipCode?: string;
-  councilDistrict?: number;
-  councilDistrictRep?: string;
-  councilDistrictRepEmail?: string;
   neighborhood?: string;
   parcelId?: string;
   sourceUrl?: string;
@@ -28,6 +25,18 @@ export type GeoRecord = {
   /** Zoning stated by the official dataset. */
   existingZoning?: string;
   requestedZoning?: string;
+
+  /* Districts, reverse-looked-up from the county's own boundary layers. */
+  councilDistrict?: number;
+  councilDistrictRep?: string;
+  councilDistrictRepEmail?: string;
+  countyDistrict?: number;
+  countyDistrictRep?: string;
+  countyDistrictRepEmail?: string;
+  schoolBoardDistrict?: number;
+  congressionalDistrict?: string;
+  stateHouseDistrict?: string;
+  stateSenateDistrict?: string;
 };
 
 /** `[ring][vertex][x, y]` — longitude/latitude pairs, outer rings first. */
@@ -252,13 +261,20 @@ function geographyFromRecord(
     latitude: record.latitude,
     longitude: record.longitude,
     zipCode: record.zipCode,
-    councilDistrict: record.councilDistrict,
-    councilDistrictRep: record.councilDistrictRep,
-    councilDistrictRepEmail: record.councilDistrictRepEmail,
     neighborhood: record.neighborhood,
     parcelId: record.parcelId,
     sourceUrl: record.sourceUrl,
     acres: record.acres,
+    councilDistrict: record.councilDistrict,
+    councilDistrictRep: record.councilDistrictRep,
+    councilDistrictRepEmail: record.councilDistrictRepEmail,
+    countyDistrict: record.countyDistrict,
+    countyDistrictRep: record.countyDistrictRep,
+    countyDistrictRepEmail: record.countyDistrictRepEmail,
+    schoolBoardDistrict: record.schoolBoardDistrict,
+    congressionalDistrict: record.congressionalDistrict,
+    stateHouseDistrict: record.stateHouseDistrict,
+    stateSenateDistrict: record.stateSenateDistrict,
     method,
     confidence,
   };

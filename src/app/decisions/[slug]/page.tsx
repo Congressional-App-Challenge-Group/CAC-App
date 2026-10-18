@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -11,12 +11,13 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { getDecision } from "@/server/decisions";
+import { getDecision, resolveSlugAlias } from "@/server/decisions";
 import { orgNames } from "@/lib/civic";
 import { hasCoordinates } from "@/lib/geography";
 import { Timeline } from "@/features/timeline/timeline";
 import { DecisionCard } from "@/features/decisions/decision-card";
 import { ParticipationPanel } from "@/features/decisions/participation";
+import { DistrictPanel } from "@/features/place/districts";
 import { AskBox } from "@/features/assistant/ask-box";
 import { ProvenancePanel } from "@/components/ui/provenance";
 import { MiniMap } from "@/components/ui/map";
@@ -98,7 +99,13 @@ function FactTile({
 export default async function DecisionPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const decision = await getDecision(slug);
-  if (!decision) notFound();
+  if (!decision) {
+    // A slug retired by the matter collapse redirects rather than 404ing, so a
+    // link shared before the record set was corrected still lands somewhere true.
+    const alias = await resolveSlugAlias(slug);
+    if (alias && alias !== slug) permanentRedirect(`/decisions/${alias}`);
+    notFound();
+  }
 
   const geography = decision.geography;
   const located = hasCoordinates(geography);
@@ -137,10 +144,16 @@ export default async function DecisionPage({ params }: { params: Promise<{ slug:
               {orgNames[decision.organization]} · {decision.topic}
             </span>
             <StatusBadge status={decision.status} />
+            {/*
+              "Plain language" and not "Editor-reviewed": the review is the
+              approval gate, which is automated and can refuse. Claiming a person
+              had read it would be one more thing the interface asserts that it
+              cannot support.
+            */}
             {decision.plainLanguageApproved ? (
               <Badge tone="accent">
                 <PenLine size={11} />
-                Editor-reviewed
+                Plain language
               </Badge>
             ) : null}
           </div>
@@ -163,8 +176,9 @@ export default async function DecisionPage({ params }: { params: Promise<{ slug:
             <Note tone="neutral" className="mt-5 flex items-start gap-2">
               <Info size={16} className="mt-0.5 shrink-0 text-civic" aria-hidden="true" />
               <span className="text-muted">
-                This is the wording of the official record, not an editor-written summary. Plain-language
-                rewrites are published only after an editor approves them against the source.
+                This is the wording of the official record. A plain-language rewrite appears here only
+                once it has passed a review that checks every figure, date and stage in it against the
+                source. This one has not, so you are reading the government&apos;s own words.
               </span>
             </Note>
           ) : null}
@@ -324,6 +338,7 @@ export default async function DecisionPage({ params }: { params: Promise<{ slug:
           </div>
 
           <ParticipationPanel decision={decision} />
+          <DistrictPanel decision={decision} />
           <ProvenancePanel
             sources={decision.sources}
             lastCheckedAt={decision.lastCheckedAt}

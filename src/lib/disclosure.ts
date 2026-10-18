@@ -28,6 +28,23 @@ export type GapMeter = {
   total: number;
   /** Missing / total, 0–1. Zero when the denominator is empty. */
   share: number;
+  /**
+   * True for a gap CivicLens itself closes rather than one it only reports.
+   *
+   * Reaching into the government's wording is the difference between describing
+   * the problem and doing something about it, so the report says which meter it
+   * has an answer for. It is the only one where the number is expected to fall.
+   */
+  ours?: boolean;
+  /**
+   * True when the meter measures this dataset rather than the government.
+   *
+   * Affected groups are not published in the source agendas at all, so the
+   * record's silence and CivicLens's inability to name the group are the same
+   * observation. Such a meter must never be quoted as the headline: it would
+   * attribute a limit of the index to the government.
+   */
+  limit?: boolean;
 };
 
 export type DisclosureReport = {
@@ -94,6 +111,20 @@ export function buildDisclosureReport(
 
   const gaps: GapMeter[] = [
     {
+      key: "language",
+      missingLabel: "Still in the government's own wording",
+      question: "How many records reach a resident in the wording the agency filed?",
+      consequence:
+        "This one is CivicLens's own gap, and it is the only meter here with a fix. A rewrite is published only after an editor approves it against the source, so a record without an approved rewrite is shown exactly as it was filed — section numbers, recitals and all.",
+      missing: decisions.filter((decision) => !decision.plainLanguageApproved).length,
+      total,
+      share: shareOf(
+        decisions.filter((decision) => !decision.plainLanguageApproved).length,
+        total,
+      ),
+      ours: true,
+    },
+    {
       key: "location",
       missingLabel: "No location disclosed",
       question: "Which records never say where they land?",
@@ -118,15 +149,19 @@ export function buildDisclosureReport(
         decisions.filter((decision) => decision.affectedRoles.length === 0).length,
         total,
       ),
+      limit: true,
     },
     {
       key: "cost",
-      missingLabel: "No figure stated",
-      question: "Of the records that move public money, how many state an amount?",
-      // Verified against the governments' own registers: Charlotte's cost field
-      // is empty across every matter, so this gap is the publisher's, not ours.
+      // Phrased so the home page can read "disclose an amount only inside prose".
+      missingLabel: "An amount only inside prose",
+      question: "Of the records that move public money, how many publish the amount only in the title text?",
+      // Verified across all three registers: the cost column came back empty for
+      // every indexed matter, while the amounts themselves sit in the title ("…
+      // Increasing Both the Expenditures and Revenues … by $365,000"). So the
+      // figure is disclosed, and it is not machine-readable.
       consequence:
-        "A budget or contract item with no figure cannot be checked from outside. This one is the government's own omission: the register's cost field came back empty for every indexed matter from Charlotte.",
+        "The amount is on the record — “Increasing Both the Expenditures and Revenues … by $365,000” — but the register's own cost field is empty for every matter indexed here. A resident can read it; nothing can total it, compare it across districts, or diff it when it changes. What was omitted is structured data, not disclosure.",
       missing: moneyRecords.filter((decision) => !decision.money?.amountUsd).length,
       total: moneyRecords.length,
       share: shareOf(
@@ -239,4 +274,17 @@ function buildScopeStatement(
 /** Percentage, for display. Kept here so no surface rounds differently. */
 export function gapPercent(meter: GapMeter): number {
   return Math.round(meter.share * 100);
+}
+
+/**
+ * The strongest omission that is a fact about the government's publishing.
+ *
+ * Excludes the meter CivicLens answers itself and the one that measures the limit
+ * of this index, because quoting either as the headline would overstate what the
+ * counting supports. Falls back to the largest share if nothing qualifies.
+ */
+export function headlineGap(report: DisclosureReport): GapMeter | undefined {
+  const publishable = report.gaps.filter((gap) => !gap.ours && !gap.limit);
+  const pool = publishable.length ? publishable : report.gaps;
+  return [...pool].sort((a, b) => b.share - a.share)[0];
 }

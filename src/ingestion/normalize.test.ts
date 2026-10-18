@@ -41,8 +41,31 @@ test("withdrawals resolve to Withdrawn", () => {
 });
 
 test("an actionless future item is Scheduled for vote and a past one is Under review", () => {
-  assert.equal(statusFromAction("", 0, "2026-09-28"), "Scheduled for vote");
-  assert.equal(statusFromAction("", 0, "2026-08-01"), "Under review");
+  // The clock is injected: read from the real one, "2026-09-28" was future when
+  // this was written and became past a month later, so the suite failed on a
+  // date it never changed.
+  assert.equal(statusFromAction("", 0, "2026-09-28", NOW), "Scheduled for vote");
+  assert.equal(statusFromAction("", 0, "2026-08-01", NOW), "Under review");
+});
+
+test("an item on today's agenda is still ahead, not past", () => {
+  /*
+   * The bug this pins down: with an instant comparison, a meeting at 6:30pm on
+   * the 15th stopped being future at 00:00 on the 15th, so every item on that
+   * day's agenda was filed as Under review and lost its countdown on the exact
+   * morning it mattered.
+   */
+  const atSixPm = new Date("2026-09-15T22:15:00Z"); // 6:15pm in Charlotte
+  assert.equal(statusFromAction("", 0, "2026-09-15", atSixPm), "Scheduled for vote");
+  assert.equal(statusFromMatter("Agenda Ready", null, "2026-09-15T00:00:00", atSixPm), "Scheduled for vote");
+});
+
+test("the day boundary is the government's local one, not UTC", () => {
+  // 9pm on the 14th in Charlotte is already the 15th in UTC. Reading the UTC
+  // date would close the 14th's window five hours early.
+  const atNinePm = new Date("2026-09-15T01:00:00Z");
+  assert.equal(statusFromMatter("Agenda Ready", null, "2026-09-14T00:00:00", atNinePm), "Scheduled for vote");
+  assert.equal(statusFromMatter("Agenda Ready", null, "2026-09-13T00:00:00", atNinePm), "Under review");
 });
 
 /* -------------------------------------------------------------------------- */
@@ -57,9 +80,18 @@ test("Agenda Ready with a stale agenda date falls back to Under review", () => {
   assert.equal(statusFromMatter("Agenda Ready", null, "2026-08-03T00:00:00", NOW), "Under review");
 });
 
-test("a register approval needs a passed date to resolve", () => {
+test("a register approval resolves from the published status label", () => {
   assert.equal(statusFromMatter("Approved", "2026-08-24T00:00:00", "2026-08-24T00:00:00", NOW), "Approved");
-  assert.equal(statusFromMatter("Approved", null, null, NOW), null);
+  // Charlotte publishes "Approved" on Zoning Decision rows with no pass date at
+  // all. Requiring one discarded the outcome and reported an approved rezoning
+  // as still under review, so the label is believed on its own.
+  assert.equal(statusFromMatter("Approved", null, "2026-08-17T00:00:00", NOW), "Approved");
+  assert.equal(statusFromMatter("Adopted", null, null, NOW), "Approved");
+});
+
+test("a qualified or legal-review status is not read as an approval", () => {
+  assert.equal(statusFromMatter("Approved as to Form", null, null, NOW), null);
+  assert.equal(statusFromMatter("Approved for Filing", null, null, NOW), null);
 });
 
 test("Filed closes a procedural matter rather than leaving it open", () => {
@@ -74,6 +106,10 @@ test("register statuses map withdrawals and deferrals too", () => {
 test("an unrecognised or empty register status resolves to nothing", () => {
   assert.equal(statusFromMatter("", null, null, NOW), null);
   assert.equal(statusFromMatter("Under Review by Council", null, null, NOW), null);
+});
+
+test("an open status that names no date stays Under review rather than being dated after", () => {
+  assert.equal(statusFromMatter("Agenda Ready", null, null, NOW), "Under review");
 });
 
 /* -------------------------------------------------------------------------- */
@@ -105,6 +141,32 @@ test("the recurring mission and vision block is not a decision", () => {
   const vision =
     'Mecklenburg Board of County Commissioners Community Vision "Mecklenburg County will be a community of pride and choice for people to live, learn, work and recreate." Board Mission: "To serve Mecklenburg County residents by helping improve their lives and community."';
   assert.ok(importance(vision) < TRACKED_THRESHOLD);
+});
+
+test("named recognitions are not tracked as decisions", () => {
+  // Regression, from a publisher whose register types these "Ceremonial Item":
+  // the word "resolution" qualified a private birthday as a legislative
+  // instrument, so it scored 4 and was presented to residents as a decision.
+  assert.ok(
+    importance("Resolution - Ms. Carrie Zimmerman Matthews 95th Birthday (10min)") < TRACKED_THRESHOLD,
+  );
+  assert.ok(importance("Proclamation - Diaper Need Awareness Week 2026 (5min)") < TRACKED_THRESHOLD);
+  assert.ok(importance("In Memoriam - Dr. Alan Whitfield") < TRACKED_THRESHOLD);
+  assert.ok(importance("Resolution honoring the 50th anniversary of the chapter") < TRACKED_THRESHOLD);
+
+  // A proclamation's subject must not qualify it: these scored on "housing"
+  // and on "adopt" (inside "Adoption") and reached the tracker.
+  assert.ok(importance("Proclamation - Supportive Housing Week (5min)") < TRACKED_THRESHOLD);
+  assert.ok(importance("Proclamation - Fair Housing Month (5min)") < TRACKED_THRESHOLD);
+  assert.ok(importance("Proclamation - National Adoption Awareness Month") < TRACKED_THRESHOLD);
+});
+
+test("the recognition rule does not swallow real instruments", () => {
+  // The pattern keys on a named person after a recognising instrument, so a
+  // genuine resolution must survive it.
+  assert.ok(importance("Resolution authorizing the purchase of right-of-way") >= TRACKED_THRESHOLD);
+  assert.ok(importance("Resolution - Easement Maintenance Services contract") >= TRACKED_THRESHOLD);
+  assert.ok(importance("Adopt the 2026 Agriculture Development and Farmland Preservation Plan") >= TRACKED_THRESHOLD);
 });
 
 test("dateOnlyOrNull reads Legistar timestamps and rejects junk", () => {

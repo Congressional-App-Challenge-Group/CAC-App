@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/server/auth";
 import { createSupabaseServiceClient } from "@/lib/supabase";
 import { slugify } from "@/ingestion/normalize";
-import { organizationValues, statusValues, type DecisionStatus } from "@/types";
+import { organizationValues, statusValues, type DecisionStatus, type Organization } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -29,8 +29,11 @@ export async function POST(request: Request) {
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const summary = typeof body.summary === "string" ? body.summary.trim() : "";
   const topic = typeof body.topic === "string" ? body.topic.trim() : "";
+  // Checked against the shared list rather than a repeated literal union: the
+  // earlier cast named the organizations by hand, so adding one to the type left
+  // this endpoint silently rejecting it.
   const organization = (typeof body.organization === "string" && organizationValues.includes(body.organization as never))
-    ? (body.organization as "charlotte" | "mecklenburg-county" | "cms")
+    ? (body.organization as Organization)
     : "charlotte";
   const status = (typeof body.status === "string" && statusValues.includes(body.status as never))
     ? (body.status as Exclude<DecisionStatus, never>)

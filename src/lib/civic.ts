@@ -3,6 +3,7 @@ import type { Organization } from "@/types";
 export const orgNames: Record<Organization, string> = {
   charlotte: "Charlotte",
   "mecklenburg-county": "Mecklenburg County",
+  "durham-county": "Durham County",
   cms: "CMS",
 };
 

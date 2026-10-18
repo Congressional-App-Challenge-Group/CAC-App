@@ -7,12 +7,22 @@ import { createSupabaseBrowserClient } from "@/lib/supabase";
 const defaults: UserPreferences = { zipCode: "28205", roles: ["Other resident"], interests: ["Public transit", "Housing", "Parks"] };
 const PREFS_KEY = "civiclens-preferences";
 const FOLLOW_KEY = "civiclens-following";
+const FOLLOW_PLACE_KEY = "civiclens-following-places";
 
 type Ctx = {
   preferences: UserPreferences;
   setPreferences: (p: UserPreferences) => void;
   following: string[];
   toggleFollow: (id: string) => void;
+  /**
+   * Followed districts, as `kind:code` keys ("council:5").
+   *
+   * A place a resident follows is the same value as the place key in a shared
+   * link, so the watchlist and the district page cannot disagree about what
+   * "District 5" means.
+   */
+  followingPlaces: string[];
+  toggleFollowPlace: (key: string) => void;
   ready: boolean;
   source: "local" | "account";
 };
@@ -42,6 +52,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
 
   const [preferences, setP] = useState<UserPreferences>(defaults);
   const [following, setFollowing] = useState<string[]>([]);
+  const [followingPlaces, setFollowingPlaces] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
   const [source, setSource] = useState<Ctx["source"]>("local");
 
@@ -69,11 +80,16 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       if (accountMode) {
         const supabase = createSupabaseBrowserClient();
         const localPrefs = safeGet<UserPreferences>(PREFS_KEY);
-        const [{ data: prefRow }, { data: followRows }] = await Promise.all([
+        const [{ data: prefRow }, { data: followRows }, { data: placeRows }] = await Promise.all([
           supabase.from("user_preferences").select("*").eq("user_id", userId).maybeSingle(),
           supabase.from("decision_follows").select("decision_id").eq("user_id", userId),
+          // A failure here is tolerated rather than fatal: the migration may not
+          // have been applied yet, and losing place follows should not stop the
+          // rest of the profile from loading.
+          supabase.from("place_follows").select("place_key").eq("user_id", userId),
         ]);
         if (!fresh) return;
+        const localPlaces = safeGet<string[]>(FOLLOW_PLACE_KEY) ?? [];
         if (prefRow) {
           setP({
             zipCode: prefRow.zip_code || defaults.zipCode,
@@ -81,18 +97,25 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
             interests: prefRow.interests ?? defaults.interests,
           });
           setFollowing((followRows ?? []).map((r) => r.decision_id as string));
+          const remotePlaces = (placeRows ?? []).map((r) => r.place_key as string);
+          // Union, so an account that predates the table keeps what is on the
+          // device instead of having its watchlist silently emptied.
+          setFollowingPlaces([...new Set([...remotePlaces, ...localPlaces])]);
         } else {
           // New account: seed from any local guest preferences so nothing is lost.
           if (localPrefs) setP((prev) => ({ ...prev, ...localPrefs }));
           setFollowing(safeGet<string[]>(FOLLOW_KEY) ?? []);
+          setFollowingPlaces(localPlaces);
         }
         setSource("account");
       } else {
         const localPrefs = safeGet<UserPreferences>(PREFS_KEY);
         const localFollows = safeGet<string[]>(FOLLOW_KEY);
+        const localPlaces = safeGet<string[]>(FOLLOW_PLACE_KEY);
         if (!fresh) return;
         if (localPrefs) setP((prev) => ({ ...prev, ...localPrefs }));
         if (localFollows) setFollowing(localFollows);
+        if (localPlaces) setFollowingPlaces(localPlaces);
         setSource("local");
       }
       if (!fresh) return;
@@ -113,6 +136,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     if (!ready || currentDone < currentStart) return;
     safeSet(PREFS_KEY, preferences);
     safeSet(FOLLOW_KEY, following);
+    safeSet(FOLLOW_PLACE_KEY, followingPlaces);
     if (!accountMode) return;
     const supabase = createSupabaseBrowserClient();
     void supabase
@@ -125,15 +149,26 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     if (following.length) {
       void supabase.from("decision_follows").insert(following.map((decisionId) => ({ user_id: userId, decision_id: decisionId })));
     }
-  }, [preferences, following, ready, accountMode, userId]);
+    void supabase.from("place_follows").delete().eq("user_id", userId);
+    if (followingPlaces.length) {
+      void supabase.from("place_follows").insert(followingPlaces.map((placeKey) => ({ user_id: userId, place_key: placeKey })));
+    }
+  }, [preferences, following, followingPlaces, ready, accountMode, userId]);
 
   const setPreferences = useCallback((prefs: UserPreferences) => setP(prefs), []);
   const toggleFollow = useCallback((id: string) => {
     setFollowing((old) => (old.includes(id) ? old.filter((x) => x !== id) : [...old, id]));
   }, []);
+  const toggleFollowPlace = useCallback((key: string) => {
+    setFollowingPlaces((old) => (old.includes(key) ? old.filter((x) => x !== key) : [...old, key]));
+  }, []);
 
   return (
-    <PreferencesContext.Provider value={{ preferences, setPreferences, following, toggleFollow, ready, source }}>{children}</PreferencesContext.Provider>
+    <PreferencesContext.Provider
+      value={{ preferences, setPreferences, following, toggleFollow, followingPlaces, toggleFollowPlace, ready, source }}
+    >
+      {children}
+    </PreferencesContext.Provider>
   );
 }
 

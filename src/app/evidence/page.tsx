@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Info, MinusCircle, ShieldAlert } from "lucide-react";
-import { getDecisions } from "@/server/decisions";
+import { getDecisions, isPrunedForList } from "@/server/decisions";
 import { buildDisclosureReport, gapPercent } from "@/lib/disclosure";
 import { PageHeader } from "@/components/ui/section";
 import { Stat, StatRow } from "@/components/ui/stat";
@@ -27,7 +27,21 @@ function gapTone(share: number): string {
 }
 
 export default async function EvidencePage() {
-  const decisions = await getDecisions();
+  /*
+   * `withRelations` is required, not an optimisation choice.
+   *
+   * The default list shape drops `sources` and `timeline` to keep card payloads
+   * small, and every meter here that counts either of them then reads 100% — no
+   * official link, and never a second timeline event — while the records plainly
+   * have both. Those two figures were wrong on this page until it was caught.
+   */
+  const decisions = await getDecisions({ withRelations: true });
+  if (decisions.some(isPrunedForList)) {
+    console.error(
+      "Evidence is measuring pruned list records; sources and timeline are empty and the link " +
+        "and single-event meters will be wrong.",
+    );
+  }
   const report = buildDisclosureReport(decisions, { now: new Date() });
 
   if (!report.total) {
@@ -103,8 +117,15 @@ export default async function EvidencePage() {
               <li key={gap.key} className="card p-5 md:p-6">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
                   <div className="min-w-0">
-                    <h3 className="text-base font-black tracking-[-0.02em] text-ink">
+                    <h3 className="flex flex-wrap items-center gap-2 text-base font-black tracking-[-0.02em] text-ink">
                       {gap.missingLabel}
+                      {/*
+                        One meter here measures CivicLens rather than the government,
+                        and it is marked as such: the only gap on the page with a
+                        stated fix, and the only one expected to fall.
+                      */}
+                      {gap.ours ? <Badge tone="accent">Ours to fix</Badge> : null}
+                      {gap.limit ? <Badge tone="neutral">A limit of this index</Badge> : null}
                     </h3>
                     <p className="mt-1 text-sm text-muted">{gap.question}</p>
                   </div>

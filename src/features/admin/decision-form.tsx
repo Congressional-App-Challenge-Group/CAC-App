@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Decision } from "@/types";
-import { statuses } from "@/types";
+import { organizationValues, statuses } from "@/types";
+import { orgNames } from "@/lib/civic";
 
 type Status = "idle" | "saving" | "saved" | "error";
 
@@ -59,9 +60,11 @@ export function DecisionForm({ decision }: { decision?: Decision }) {
         <label>
           <span className="font-bold">Organization</span>
           <select className="field mt-2" name="organization" defaultValue={decision?.organization}>
-            <option value="charlotte">Charlotte</option>
-            <option value="mecklenburg-county">Mecklenburg County</option>
-            <option value="cms">CMS</option>
+            {organizationValues.map((value) => (
+              <option key={value} value={value}>
+                {orgNames[value]}
+              </option>
+            ))}
           </select>
         </label>
         <label>

@@ -57,7 +57,7 @@ export function DecisionCard({ decision, reason }: { decision: Decision; reason?
         {decision.plainLanguageApproved ? (
           <span className="flex items-center gap-1.5 font-bold text-civic-strong">
             <PenLine size={13} />
-            Editor-reviewed
+            Plain language
           </span>
         ) : null}
       </div>

@@ -7,6 +7,8 @@ import { useDecisions } from "@/components/decisions-provider";
 import { usePreferences } from "@/features/preferences/preferences";
 import { DecisionCard } from "@/features/decisions/decision-card";
 import { ChangeCard } from "@/features/changes/change-card";
+import { WeekPlan } from "@/features/actions/week-plan";
+import { Omission } from "@/features/brief/omission";
 import { groupChangesByDecision } from "@/lib/changes";
 import { formatDeadlineDate, upcomingActions } from "@/lib/deadlines";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -229,6 +231,23 @@ export function Brief({ changes }: { changes: DecisionChange[] }) {
 
   return (
     <div className="space-y-16">
+      <Reveal>
+        <section aria-labelledby="week-heading">
+          <SectionHeading
+            eyebrow="Your week"
+            title="What to act on now"
+            description="At most three items: dated for a decision in the next seven days, or sitting in the district you live in. A shorter list is a real answer."
+            actionHref="/my-area"
+            actionLabel="My area"
+          />
+          <WeekPlan />
+        </section>
+      </Reveal>
+
+      <Reveal>
+        <Omission />
+      </Reveal>
+
       <Reveal>
         <section aria-labelledby="deadlines-heading">
           <SectionHeading

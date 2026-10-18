@@ -79,7 +79,12 @@ export const isDecidedStatus = (status: DecisionStatus): boolean =>
 
 // Values arrays for server/client validation without leaking tuple-only literals.
 export const statusValues: readonly string[] = statuses as readonly string[];
-export const organizationValues = ["charlotte", "mecklenburg-county", "cms"] as const;
+export const organizationValues = [
+  "charlotte",
+  "mecklenburg-county",
+  "durham-county",
+  "cms",
+] as const;
 export type Organization = (typeof organizationValues)[number];
 
 export type VerificationStatus = "verified" | "reviewed" | "unconfirmed";
@@ -128,18 +133,42 @@ export type DecisionGeography = {
   latitude?: number;
   longitude?: number;
   zipCode?: string;
-  councilDistrict?: number;
   neighborhood?: string;
   parcelId?: string;
   sourceUrl?: string;
-  /** District representative, from the city's official council-district layer. */
-  councilDistrictRep?: string;
-  councilDistrictRepEmail?: string;
   /** Petition acreage, when the official dataset states it. */
   acres?: number;
   method: GeoMethod;
   confidence: GeoConfidence;
   verifiedAt?: string;
+
+  /* ---------------------------------------------------------------------- */
+  /* Districts — who actually decides, resolved from the county's own        */
+  /* boundary layers. A resident's address falls in one of each, which is    */
+  /* what lets the product answer "which of my representatives votes on      */
+  /* this" without asking anyone to guess.                                   */
+  /* ---------------------------------------------------------------------- */
+
+  /** Charlotte City Council district, from the city's own boundary layer. */
+  councilDistrict?: number;
+  /** District representative, from the same layer. */
+  councilDistrictRep?: string;
+  councilDistrictRepEmail?: string;
+
+  /** Mecklenburg Board of County Commissioners district. */
+  countyDistrict?: number;
+  countyDistrictRep?: string;
+  countyDistrictRepEmail?: string;
+
+  /** CMS Board of Education district. */
+  schoolBoardDistrict?: number;
+
+  /** NC congressional district, as the county publishes it ("12", not "NC-12"). */
+  congressionalDistrict?: string;
+  /** NC House district. */
+  stateHouseDistrict?: string;
+  /** NC Senate district. */
+  stateSenateDistrict?: string;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -272,6 +301,25 @@ export type Decision = {
   requester?: string;
   /** True when the summary/why-it-matters shown came from an approved draft. */
   plainLanguageApproved?: boolean;
+
+  /* ---------------------------------------------------------------------- */
+  /* Matter identity — one thing the government is doing, however many times */
+  /* it appeared. These fields exist because the same rezoning is filed as a  */
+  /* new Legistar matter at every meeting it touches.                        */
+  /* ---------------------------------------------------------------------- */
+  /**
+   * Stable identity of the underlying matter, independent of appearance count.
+   * `petition:<org>:<year>-<seq>`, `matter:<org>:<id>`, or `title:<org>:<title>`.
+   */
+  matterKey?: string;
+  /** Every official record id this matter was assembled from. */
+  appearanceIds?: string[];
+  /** How many official appearances were merged into this record. */
+  appearanceCount?: number;
+  /** ISO date of the earliest appearance. */
+  firstSeenAt?: string;
+  /** ISO date of the most recent official activity. */
+  lastActivityAt?: string;
 };
 
 export type UserPreferences = { zipCode: string; roles: UserRole[]; interests: string[] };

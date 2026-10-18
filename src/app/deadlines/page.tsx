@@ -12,7 +12,8 @@ import {
 } from "@/lib/deadlines";
 import { PageHeader } from "@/components/ui/section";
 import { EmptyState } from "@/components/ui/empty-state";
-import { StatusBadge } from "@/components/ui/badge";
+import { Badge, StatusBadge } from "@/components/ui/badge";
+import { agendaKind, agendaKindNote } from "@/lib/agenda";
 import { isOpenStatus } from "@/types";
 
 export const revalidate = 300;
@@ -20,7 +21,7 @@ export const revalidate = 300;
 export const metadata: Metadata = {
   title: "Deadlines",
   description:
-    "Every tracked decision with a published date for its next action, ordered by how long is left.",
+    "Every tracked item with a date the official record states, ordered by how long is left — and which of them the agenda actually schedules a decision on.",
 };
 
 /** Display order: the soonest and most consequential first. */
@@ -28,7 +29,9 @@ const BANDS: Array<{ key: DeadlineUrgency; title: string; blurb: string }> = [
   {
     key: "today",
     title: "Being decided today",
-    blurb: "The record states today's meeting. This is the last day to be heard on these.",
+    // Not "the last day to be heard": a section can schedule a vote with no
+    // public comment at all, and each body sets its own rules.
+    blurb: "The record states today's meeting. How this body takes public comment is set by its own rules — the linked agenda says which section the item sits in.",
   },
   {
     key: "tomorrow",
@@ -61,6 +64,8 @@ function bandTone(key: DeadlineUrgency): string {
 function Row({ item }: { item: UpcomingItem }) {
   const { decision, deadline, days, countdown: label } = item;
   const urgent = days <= 1;
+  const kind = agendaKind(deadline.officialStatus);
+  const note = agendaKindNote(deadline.officialStatus);
 
   return (
     <li className="border-t border-line first:border-t-0">
@@ -84,7 +89,16 @@ function Row({ item }: { item: UpcomingItem }) {
             <span className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-subtle">
               {orgNames[decision.organization]}
             </span>
-            <StatusBadge status={decision.status} />
+            {/*
+              A briefing or a report is not "Scheduled for vote", whatever the
+              stage field says, so the stage badge is withheld there rather than
+              repeating a claim the agenda contradicts.
+            */}
+            {kind === "informational" ? (
+              <Badge tone="neutral">No vote scheduled</Badge>
+            ) : (
+              <StatusBadge status={decision.status} />
+            )}
           </div>
           <p className="mt-2 font-extrabold leading-snug text-ink transition-colors group-hover:text-civic">
             {decision.title}
@@ -94,10 +108,15 @@ function Row({ item }: { item: UpcomingItem }) {
               <CalendarClock size={12} aria-hidden="true" />
               {formatDeadlineDate(deadline.date!)}
             </span>
-            {deadline.label ? <span>{deadline.label}</span> : null}
+            {deadline.officialStatus ? (
+              <span className="font-bold text-ink-soft">“{deadline.officialStatus}”</span>
+            ) : deadline.label ? (
+              <span>{deadline.label}</span>
+            ) : null}
             {decision.geography?.zipCode ? <span>ZIP {decision.geography.zipCode}</span> : null}
             {decision.requester ? <span>Requested by {decision.requester}</span> : null}
           </div>
+          {note ? <p className="mt-1.5 text-xs leading-5 text-subtle">{note}</p> : null}
         </div>
       </Link>
     </li>
@@ -109,6 +128,18 @@ export default async function DeadlinesPage() {
   const now = new Date();
   const items = upcomingActions(decisions, { now });
 
+  /*
+   * Items whose agenda section schedules no vote are separated out.
+   *
+   * They keep their real date — the meeting is genuinely happening — but they
+   * are not "about to be decided", so they cannot sit under a band that says so.
+   * Of the six Mecklenburg items on 20 October, three were a staff briefing, a
+   * manager's report and a commissioner reports section; all three were listed as
+   * "Scheduled for vote" until the agenda sections were read.
+   */
+  const scheduled = items.filter((item) => agendaKind(item.deadline.officialStatus) !== "informational");
+  const briefed = items.filter((item) => agendaKind(item.deadline.officialStatus) === "informational");
+
   const open = decisions.filter((decision) => isOpenStatus(decision.status));
   const undated = open.filter((decision) => !items.some((item) => item.decision.id === decision.id));
 
@@ -117,13 +148,13 @@ export default async function DeadlinesPage() {
       <PageHeader
         eyebrow="On the clock"
         title="What's about to be decided"
-        description="A tracker tells you what happened. This tells you what still can be changed — every item below has a date the official record itself states."
+        description="A tracker tells you what happened. This tells you what still can be changed — every item below has a date the official record itself states, and none of them is guessed."
       />
 
-      {items.length ? (
+      {scheduled.length ? (
         <div className="mt-10 space-y-10">
           {BANDS.map((band) => {
-            const bandItems = items.filter((item) => item.urgency === band.key);
+            const bandItems = scheduled.filter((item) => item.urgency === band.key);
             if (!bandItems.length) return null;
 
             return (
@@ -151,11 +182,35 @@ export default async function DeadlinesPage() {
       ) : (
         <div className="mt-10">
           <EmptyState
-            title="Nothing currently has a published action date"
+            title="Nothing currently has a published date for a decision"
             body="When a government publishes a date for its next action on a tracked item, it appears here with a countdown. Until then, there is nothing to count down to — and CivicLens does not estimate one."
           />
         </div>
       )}
+
+      {briefed.length ? (
+        <section className="mt-12" aria-labelledby="band-briefed">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <h2 id="band-briefed" className="display-3 text-ink">
+              Also on the agenda
+            </h2>
+            <span className="rounded-full border border-line bg-surface-2 px-2.5 py-1 text-[0.68rem] font-extrabold uppercase tracking-[0.06em] text-ink-soft">
+              No vote scheduled · {briefed.length}
+            </span>
+          </div>
+          <p className="mt-2 max-w-2xl text-sm text-muted">
+            These items have a published date — the meeting is happening — but the agenda
+            schedules no vote on them: a briefing, a report or a short presentation. They are
+            listed so the date is not mistaken for a decision pending, and so the record is not
+            emptier than it is.
+          </p>
+          <ul className="card mt-4 overflow-hidden p-0">
+            {briefed.map((item) => (
+              <Row key={item.decision.id} item={item} />
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="mt-12 border-t border-line pt-8">
         <div className="flex items-start gap-3 rounded-[var(--radius-lg)] border border-line bg-surface-2 p-5">

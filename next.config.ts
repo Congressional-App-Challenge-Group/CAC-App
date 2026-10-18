@@ -13,6 +13,14 @@ const nextConfig: NextConfig = {
       "./.civiclens/local-decisions.json",
       "./.civiclens/drafts.json",
       "./.civiclens/changes.json",
+      // Slugs retired by the matter collapse resolve to their surviving record,
+      // so a link shared before CivicLens corrected its own counting still works.
+      "./.civiclens/slug-aliases.json",
+      // Generalised district boundaries, used only to place a reader's own
+      // address. Record-level district matching reads the codes already stored
+      // on each record, so this artifact being absent degrades the address
+      // lookup alone rather than emptying the district surfaces.
+      "./.civiclens/place-boundaries.json",
     ],
   },
 };

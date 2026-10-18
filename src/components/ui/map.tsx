@@ -14,10 +14,23 @@ export type MapPoint = {
   tone?: "default" | "accent";
 };
 
+/**
+ * A filled outline, in the same [longitude, latitude] ring form the boundary
+ * artifact uses, so the geometry can pass from the county's own dataset to the
+ * screen without being reshaped on the way.
+ */
+export type MapShape = {
+  id: string;
+  rings: number[][][];
+  label?: string;
+  tone?: "accent" | "muted";
+};
+
 type Props = {
   center: { latitude: number; longitude: number };
   zoom?: number;
   points?: MapPoint[];
+  shapes?: MapShape[];
   height?: number;
   interactive?: boolean;
   className?: string;
@@ -27,6 +40,19 @@ type Props = {
 
 const MIN_ZOOM = 9;
 const MAX_ZOOM = 17;
+
+/**
+ * Absolute positions are written as fixed-precision pixel strings, not numbers.
+ *
+ * React's server renderer rounds a numeric style value to four decimals while the
+ * client writes the full float, so every marker hydrated with a mismatched
+ * `left`/`top` and React reported the whole map as a hydration error. A string
+ * is passed through unchanged on both sides, and a tenth of a pixel is below
+ * anything the eye can resolve.
+ */
+function px(value: number): string {
+  return `${value.toFixed(1)}px`;
+}
 
 function tileUrl(x: number, y: number, z: number) {
   return `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
@@ -45,6 +71,7 @@ export function MiniMap({
   center,
   zoom: initialZoom = 13,
   points = [],
+  shapes = [],
   height = 320,
   interactive = true,
   className,
@@ -105,6 +132,29 @@ export function MiniMap({
     }
     return list;
   }, [originX, originY, size.width, size.height, zoom]);
+
+  /**
+   * District outlines, projected into screen coordinates.
+   *
+   * Drawn as one SVG path per boundary rather than as projected pixel layers, so
+   * a ring of several thousand vertices stays a single cheap element and the
+   * browser can resolve the fills instead of the layout engine.
+   */
+  const outlines = useMemo(() => {
+    return shapes.map((shape) => {
+      const directions: string[] = [];
+      for (const ring of shape.rings) {
+        ring.forEach((vertex, index) => {
+          const projected = projectMercator(vertex[1], vertex[0], zoom);
+          directions.push(
+            `${index === 0 ? "M" : "L"}${(projected.x - originX).toFixed(1)} ${(projected.y - originY).toFixed(1)}`,
+          );
+        });
+        directions.push("Z");
+      }
+      return { id: shape.id, label: shape.label, tone: shape.tone ?? "accent", d: directions.join(" ") };
+    });
+  }, [shapes, originX, originY, zoom]);
 
   const markers = useMemo(() => {
     return points.map((point) => {
@@ -175,9 +225,29 @@ export function MiniMap({
           draggable={false}
           loading="lazy"
           className="pointer-events-none absolute select-none"
-          style={{ left: tile.left, top: tile.top }}
+          style={{ left: px(tile.left), top: px(tile.top) }}
         />
       ))}
+
+      {outlines.length ? (
+        <svg
+          className="pointer-events-none absolute left-0 top-0"
+          width={size.width || 1}
+          height={size.height || 1}
+          aria-hidden="true"
+        >
+          {outlines.map((outline) => (
+            <path
+              key={outline.id}
+              d={outline.d}
+              fill={outline.tone === "muted" ? "rgb(var(--ink) / 0.06)" : "rgb(var(--civic) / 0.14)"}
+              stroke={outline.tone === "muted" ? "rgb(var(--ink) / 0.35)" : "rgb(var(--civic))"}
+              strokeWidth={2}
+              strokeLinejoin="round"
+            />
+          ))}
+        </svg>
+      ) : null}
 
       {markers.map((marker) => {
         const active = marker.id === activeId;
@@ -194,7 +264,7 @@ export function MiniMap({
           <div
             key={marker.id}
             className="absolute -translate-x-1/2 -translate-y-1/2"
-            style={{ left: marker.left, top: marker.top }}
+            style={{ left: px(marker.left), top: px(marker.top) }}
             title={marker.label}
           >
             {marker.href ? (

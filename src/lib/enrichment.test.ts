@@ -7,8 +7,11 @@ import {
   draftSummary,
   draftWhyItMatters,
   extractZoningChange,
+  instrumentFor,
   isTitleDuplicate,
+  joinInstrument,
   needsPlainLanguage,
+  summaryIsScaffolding,
   zoningTransition,
 } from "./enrichment";
 import type { Decision } from "@/types";
@@ -154,6 +157,83 @@ test("applyApprovedDrafts replaces only approved fields", () => {
   assert.equal(applied.whyItMatters, decision().whyItMatters);
   assert.equal(applied.nextStep, decision().nextStep);
   assert.equal(applied.plainLanguageApproved, true);
+});
+
+/** The subject a title states, and the wording the summary joins it with. */
+test("a title's own separator supplies the subject", () => {
+  const phrase = instrumentFor("Construction Contract - Sam Billings Center Equipment Replacement");
+  assert.equal(joinInstrument(phrase!), "a contract for Sam Billings Center Equipment Replacement");
+});
+
+test("an address is not read as a case reference", () => {
+  // "A lease, 4821 Express Drive" would be the bug: a street number opens with a
+  // digit, but it is not an appositive.
+  const phrase = instrumentFor("Airport Facility Lease - 4821 Express Drive");
+  assert.equal(joinInstrument(phrase!), "a lease at 4821 Express Drive");
+});
+
+test("a case reference follows the instrument in a comma", () => {
+  const phrase = instrumentFor("Budget Ordinance Amendment No. 26BCC073 - Transferring $117,630.96");
+  assert.equal(
+    joinInstrument(phrase!),
+    "a budget ordinance amendment, No. 26BCC073, Transferring $117,630.96",
+  );
+});
+
+test("the longest titles keep their subject instead of collapsing to their category", () => {
+  const summary = draftSummary(
+    decision({
+      title:
+        "Approval of Budget Ordinance Amendment No.27BCC018 Increasing Both the Expenditures and Revenues of the Shoppes of Hope Valley Fund Center by $365,000",
+    }),
+  );
+  assert.match(summary, /Shoppes of Hope Valley/);
+  assert.doesNotMatch(summary, /^Before Charlotte: an approval request for\./);
+});
+
+test("a captured verb phrase is phrased as a request to act", () => {
+  const summary = draftSummary(decision({ title: "Approve and Authorize the Manager to Execute Documents" }));
+  assert.match(summary, /^Before Charlotte: a request to authorize the Manager/);
+});
+
+test("a captured noun phrase is phrased as a request for a thing", () => {
+  const summary = draftSummary(decision({ title: "Approve Execution of Construction Contract with Trifecta" }));
+  assert.match(summary, /^Before Charlotte: an approval request for execution of Construction Contract/);
+});
+
+test("the topic fallback agrees with its own article", () => {
+  assert.match(draftSummary(decision({ title: "Ready Mix Concrete", topic: "Education" })), /^An education item before Charlotte\./);
+  assert.match(draftSummary(decision({ title: "Ready Mix Concrete", topic: "Roads" })), /^A roads item before Charlotte\./);
+});
+
+test("a scaffolding summary is recognised, and a quoted record rescues one", () => {
+  assert.equal(summaryIsScaffolding("Before Durham County: a public hearing. The indexed record currently shows it as under review."), true);
+  assert.equal(
+    summaryIsScaffolding("A local government item before Charlotte. The indexed record currently shows it as approved."),
+    true,
+  );
+  assert.equal(
+    summaryIsScaffolding(
+      "Before Mecklenburg County: a contract for Valerie C. Woodard Center Deep Energy Retrofit Project. The indexed record currently shows it as under review.",
+    ),
+    false,
+  );
+  assert.equal(
+    summaryIsScaffolding(
+      "A local government item before Charlotte. The indexed record currently shows it as approved. The record states: “A motion was made to Approve this Consent Item.”",
+    ),
+    false,
+  );
+});
+
+test("applyApprovedDrafts raises the reviewed flag only for an approved summary", () => {
+  // An approved why-it-matters is not a rewrite of the record's own wording, so a
+  // page still printing that wording must not carry the "Editor-reviewed" badge.
+  const applied = applyApprovedDrafts(decision(), [
+    { field: "whyItMatters", draftText: "An editor-approved note.", status: "approved" },
+  ]);
+  assert.equal(applied.whyItMatters, "An editor-approved note.");
+  assert.equal(applied.plainLanguageApproved, false);
 });
 
 test("applyApprovedDrafts leaves the record untouched when nothing is approved", () => {

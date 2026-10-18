@@ -1,6 +1,10 @@
 import { dateOnlyOrNull, plain, statusFromMatter } from "../src/ingestion/normalize";
 import { governmentSources } from "../src/ingestion/sources";
+import { schedulesNoVote } from "../src/lib/agenda";
 import { orgNames } from "../src/lib/civic";
+import { daysUntil } from "../src/lib/deadlines";
+import { unstatedOutcomeNote } from "../src/lib/sources";
+import { stageRank } from "../src/lib/matter";
 import type { Decision, DecisionDeadline, DecisionStatus } from "../src/types";
 import { numberOrUndefined, pick, readJson, report, serviceClient, writeJson, type Dict } from "./shared";
 
@@ -117,9 +121,32 @@ function applyMatter(
     next.status = resolved;
   }
 
+  /*
+   * A section that schedules no vote cannot leave the record claiming one.
+   *
+   * The register files briefings, manager's reports and commissioner reports
+   * under their own agenda section, and the meeting-item feed gives every future
+   * item the stage "Scheduled for vote" because it has no other vocabulary for
+   * "on a future agenda". Three items on the 20 October Mecklenburg agenda were
+   * reported as scheduled for a vote that the agenda never schedules. They stay
+   * open — nothing about them is decided — and the date is kept below, so the
+   * reader still sees when the meeting is.
+   */
+  const informational = schedulesNoVote(officialStatus);
+  if (informational && next.status === "Scheduled for vote") {
+    applied.statusChanged = true;
+    next.status = "Under review";
+  }
+
   // 2. The date of the next scheduled action — the deadline instrument's fuel.
   const scheduledStatuses: DecisionStatus[] = ["Scheduled for vote", "Public feedback", "Proposed"];
-  if (agendaDate && scheduledStatuses.includes(next.status) && new Date(`${agendaDate}T23:59:59Z`) >= now) {
+  // `daysUntil(...) >= 0` counts today, matching the interface: a matter on
+  // tonight's agenda is the most actionable item there is, not a past one.
+  if (
+    agendaDate &&
+    (scheduledStatuses.includes(next.status) || informational) &&
+    daysUntil(agendaDate, now) >= 0
+  ) {
     const deadline: DecisionDeadline = {
       date: agendaDate,
       label: `Scheduled on the ${orgNames[decision.organization]} agenda`,
@@ -129,6 +156,11 @@ function applyMatter(
     };
     if (next.deadline?.date !== deadline.date) applied.deadlineSet = true;
     next.deadline = deadline;
+
+    // The stage no longer says "vote", so the next step must not either.
+    if (informational) {
+      next.nextStep = `Listed on the ${orgNames[decision.organization]} agenda as “${officialStatus}” on ${agendaDate}.`;
+    }
 
     // Keep the short date list consistent with the confirmed action date.
     const others = next.importantDates.filter((entry) => entry.date !== agendaDate);
@@ -170,7 +202,11 @@ function applyMatter(
       // No date is attached here on purpose. Stamping the run date would churn the
       // field on every run and imply the register said this today, when all it
       // states is the stage.
-      next.latestUpdate = `${quoted}. The register states no date for its next action.`;
+      //
+      // For a publisher whose record never states an outcome, the line also says
+      // so. "Under review" would otherwise read as "still pending", which is the
+      // opposite claim from "this publisher does not record what happened".
+      next.latestUpdate = unstatedOutcomeNote(decision.organization, quoted);
     }
   }
 
@@ -182,6 +218,60 @@ function applyMatter(
   }
 
   return { decision: next, applied };
+}
+
+/**
+ * The register row that best describes where this matter actually stands.
+ *
+ * Charlotte files one rezoning as many matters — one per meeting — so a merged
+ * matter carries several ids and the register holds a row for each. Reading a
+ * single row would report whichever appearance it happened to be.
+ *
+ * The precedence is deliberate and matters more than it looks:
+ *
+ *   1. **A matter the government has scheduled again wins outright.** If a future
+ *      agenda date exists, the matter is live, whatever happened earlier. Without
+ *      this rule a rezoning scheduled for next week could be reported as decided
+ *      on the strength of a stale row, which would hide the one thing a reader can
+ *      still act on.
+ *   2. Otherwise the furthest stage reached wins.
+ *   3. Otherwise the most recent meeting.
+ */
+function bestStageRow(
+  ids: number[],
+  matters: Map<number, Dict>,
+  now: Date,
+): Dict | undefined {
+  const today = now.toISOString().slice(0, 10);
+  let best: { row: Dict; live: number; rank: number; agenda: string } | null = null;
+
+  for (const id of ids) {
+    const row = matters.get(id);
+    if (!row) continue;
+
+    const agenda = dateOnlyOrNull(pick(row, /^MatterAgendaDate$/i)) ?? "";
+    const status = statusFromMatter(
+      plain(pick(row, /^MatterStatusName$/i)),
+      dateOnlyOrNull(pick(row, /^MatterPassedDate$/i)),
+      dateOnlyOrNull(pick(row, /^MatterAgendaDate$/i)),
+      now,
+    );
+    const candidate = {
+      row,
+      live: agenda && agenda >= today ? 1 : 0,
+      rank: status ? stageRank(status) : -1,
+      agenda,
+    };
+
+    const better =
+      !best ||
+      candidate.live > best.live ||
+      (candidate.live === best.live && candidate.rank > best.rank) ||
+      (candidate.live === best.live && candidate.rank === best.rank && candidate.agenda > best.agenda);
+    if (better) best = candidate;
+  }
+
+  return best?.row;
 }
 
 async function main() {
@@ -212,8 +302,16 @@ async function main() {
     const prefix = `${source.key}:`;
     const candidates = decisions
       .filter((decision) => decision.id.startsWith(prefix))
-      .map((decision) => ({ decision, matterId: Number(decision.id.slice(prefix.length)) }))
-      .filter((entry) => Number.isInteger(entry.matterId) && entry.matterId > 0);
+      .map((decision) => {
+        // Every id the matter was assembled from is queried, because the same
+        // rezoning is filed under a new matter id at each meeting it touches.
+        const own = Number(decision.id.slice(prefix.length));
+        const matterIds = (decision.appearanceIds?.length ? decision.appearanceIds : [String(own)])
+          .map(Number)
+          .filter((id) => Number.isInteger(id) && id > 0);
+        return { decision, matterIds };
+      })
+      .filter((entry) => entry.matterIds.length > 0);
 
     if (!candidates.length) {
       notes.push(`${source.name}: no numeric matter ids to resolve.`);
@@ -222,7 +320,10 @@ async function main() {
 
     let rows: Dict[] = [];
     try {
-      rows = await fetchMatters(source.client!, candidates.map((entry) => entry.matterId));
+      rows = await fetchMatters(
+        source.client!,
+        [...new Set(candidates.flatMap((entry) => entry.matterIds))],
+      );
     } catch (error) {
       notes.push(
         `${source.name}: register unreachable (${error instanceof Error ? error.message : "unknown"}).`,
@@ -240,7 +341,7 @@ async function main() {
     for (const entry of candidates) {
       if (entry.decision.status === "Under review") unresolvedBefore += 1;
 
-      const matter = matters.get(entry.matterId);
+      const matter = bestStageRow(entry.matterIds, matters, now);
       if (!matter) {
         if (entry.decision.status === "Under review") unresolvedAfter += 1;
         continue;

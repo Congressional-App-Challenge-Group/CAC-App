@@ -21,8 +21,11 @@
     "enrich:language": "node --env-file-if-exists=.env.local --import tsx scripts/enrich-plain-language.ts",
     "enrich:matters": "node --import tsx scripts/enrich-matters.ts",
     "changes": "node --import tsx scripts/detect-changes.ts",
+    "approve:drafts": "node --env-file-if-exists=.env.local --import tsx scripts/approve-drafts.ts",
+    "language": "pnpm enrich:language && pnpm approve:drafts",
+    "collapse": "node --import tsx scripts/collapse-matters.ts",
     "deadlines": "node --import tsx scripts/report-deadlines.ts",
-    "pipeline": "pnpm ingest:local && pnpm enrich:matters && pnpm changes && pnpm enrich"
+    "pipeline": "pnpm ingest:local && pnpm collapse && pnpm enrich:matters && pnpm changes && pnpm enrich"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

@@ -18,8 +18,10 @@ export function Footer() {
             </div>
           </div>
           <p className="mt-4 max-w-sm text-sm leading-6 text-muted">
-            Local government decisions, rewritten in plain language and linked to the official record.
-            Where a record does not confirm something, CivicLens leaves it blank rather than guessing.
+            Local government decisions, linked to the official record and rewritten in plain language
+            once the wording has passed a review that checks it against the source. Where a record does
+            not confirm something, CivicLens leaves it blank rather than guessing — and counts the
+            blanks.
           </p>
         </div>
 
@@ -31,6 +33,7 @@ export function Footer() {
               { href: "/changes", label: "What changed" },
               { href: "/my-area", label: "My area" },
               { href: "/ask", label: "Ask the record" },
+              { href: "/evidence", label: "What the record omits" },
               { href: "/about", label: "How it works" },
             ].map((link) => (
               <li key={link.href}>

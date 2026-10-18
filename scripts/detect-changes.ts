@@ -1,5 +1,6 @@
 import { rm } from "node:fs/promises";
 import {
+  SNAPSHOT_MODEL,
   diffSnapshots,
   holdBackPipelineResolutions,
   toSnapshot,
@@ -29,12 +30,29 @@ async function main() {
   const previous = await readJson<Snapshot>("snapshots/latest.json");
   const lines: string[] = [];
 
-  if (!previous) {
+  /*
+   * A snapshot from a different record model is a new baseline, not a diff.
+   *
+   * Collapsing agenda appearances into matters re-identifies most of the record
+   * set at once. Diffing across that boundary reports the restructuring itself —
+   * every merged timeline looks like sudden movement — which would open the
+   * feed with noise from our own bookkeeping. Nothing the government did changed,
+   * so nothing is reported, and the snapshot is re-taken in the current model.
+   */
+  if (!previous || previous.model !== SNAPSHOT_MODEL) {
     lines.push(
       `Baseline established for ${decisions.length} records.`,
       "No changes reported on a first run — a first appearance is a",
       "publication, not a movement.",
     );
+    if (previous) {
+      lines.push(
+        "",
+        `Previous snapshot used record model "${previous.model ?? "agenda-appearances"}";`,
+        `this run uses "${SNAPSHOT_MODEL}". The record set was restructured, so`,
+        "diffing across the boundary would report our own re-counting as news.",
+      );
+    }
     await writeJson("snapshots/latest.json", toSnapshot(decisions));
     // The baseline already contains any pipeline resolution, so the marker is
     // obsolete once it has been absorbed.

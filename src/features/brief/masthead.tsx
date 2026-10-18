@@ -25,6 +25,14 @@ export function Masthead({ changedThisWeek }: { changedThisWeek: number }) {
     (decision) => decision.geography?.zipCode || decision.geography?.address,
   ).length;
 
+  /**
+   * How many records carry an editor-approved rewrite.
+   *
+   * The hero used to promise plain language unconditionally. It is now a measured
+   * figure, so the sentence and the count can never drift apart.
+   */
+  const rewritten = decisions.filter((decision) => decision.plainLanguageApproved).length;
+
   return (
     <section className="relative overflow-hidden border-b border-line bg-surface-2">
       <div className="hero-grid absolute inset-0 opacity-70" aria-hidden="true" />
@@ -41,7 +49,7 @@ export function Masthead({ changedThisWeek }: { changedThisWeek: number }) {
             <p className="mt-6 max-w-2xl reading md:text-lg">
               Decisions from {govSources.map((source) => source.name).join(", ")} — rewritten in plain
               language and linked to the official record. When a record doesn&apos;t confirm something,
-              we say so instead of guessing.
+              we say so instead of guessing, and we count those silences rather than hide them.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/explore" className={buttonClass("primary", "lg")}>
@@ -62,6 +70,16 @@ export function Masthead({ changedThisWeek }: { changedThisWeek: number }) {
               hint={changedThisWeek === 0 ? "No movements recorded yet" : undefined}
             />
             <Stat value={located} label="With a confirmed location" />
+            <Stat
+              className="col-span-2"
+              value={rewritten}
+              label="Rewritten in plain language"
+              hint={
+                decisions.length
+                  ? `Reviewed against the source. ${decisions.length - rewritten} keep the agency's own wording.`
+                  : undefined
+              }
+            />
             <Stat value={ready ? preferences.zipCode : "—"} label="Your ZIP code" />
           </dl>
         </div>

@@ -81,6 +81,20 @@ function mapGeography(row: Row): DecisionGeography | undefined {
     longitude: numberOrUndefined(raw.longitude),
     zipCode: text(raw.zip_code) || undefined,
     councilDistrict: numberOrUndefined(raw.council_district),
+    // District representatives and acreage come from the county's own layers. They
+    // were produced by the matcher and rendered by the participation panel for
+    // some time before there was anywhere to store them, which meant the panel
+    // worked on the static dataset and rendered nothing against Supabase.
+    councilDistrictRep: text(raw.council_district_rep) || undefined,
+    councilDistrictRepEmail: text(raw.council_district_rep_email) || undefined,
+    countyDistrict: numberOrUndefined(raw.county_district),
+    countyDistrictRep: text(raw.county_district_rep) || undefined,
+    countyDistrictRepEmail: text(raw.county_district_rep_email) || undefined,
+    schoolBoardDistrict: numberOrUndefined(raw.school_board_district),
+    congressionalDistrict: text(raw.congressional_district) || undefined,
+    stateHouseDistrict: text(raw.state_house_district) || undefined,
+    stateSenateDistrict: text(raw.state_senate_district) || undefined,
+    acres: numberOrUndefined(raw.acres),
     neighborhood: text(raw.neighborhood) || undefined,
     parcelId: text(raw.parcel_id) || undefined,
     sourceUrl: text(raw.source_url) || undefined,
@@ -163,6 +177,13 @@ function mapDecision(row: Row): Decision {
     money: mapMoney(row),
     deadline: mapDeadline(row),
     requester: text(row.requester) || undefined,
+    // Matter identity. Absent on rows written before the collapse existed, which
+    // the interface treats the same way as any other unconfirmed field.
+    matterKey: text(row.matter_key) || undefined,
+    appearanceIds: Array.isArray(row.appearance_ids) ? (row.appearance_ids as string[]) : undefined,
+    appearanceCount: numberOrUndefined(row.appearance_count),
+    firstSeenAt: text(row.first_seen_at) || undefined,
+    lastActivityAt: text(row.last_activity_at) || undefined,
   };
 
   const drafts = (row.decision_drafts || []).map(mapDraftRow);
@@ -219,14 +240,61 @@ async function localDrafts(): Promise<DecisionDraft[]> {
   return (await readArtifact<DecisionDraft[]>("drafts.json")) ?? [];
 }
 
+async function localAliases(): Promise<Record<string, string>> {
+  return (await readArtifact<Record<string, string>>("slug-aliases.json")) ?? {};
+}
+
+/**
+ * A slug retired by the matter collapse.
+ *
+ * Merging ten appearances into one matter leaves nine public URLs pointing at
+ * nothing. A link someone already shared should not 404 because CivicLens
+ * corrected its own counting, so the retired slug resolves to its survivor.
+ */
+export async function resolveSlugAlias(slug: string): Promise<string | null> {
+  return (await localAliases())[slug] ?? null;
+}
+
+/**
+ * Trims a decision for a list view.
+ *
+ * `sources` and `timeline` are dropped because a card never renders them and
+ * they dominate the payload. That makes this function's output *unsafe to
+ * measure with*: a caller that counts sources or timeline events gets zero for
+ * every record, and two figures on the disclosure page quietly read 100% because
+ * of it — "no official link" and "never recorded a second action" — while the
+ * records themselves cite sources and carry multi-event timelines.
+ *
+ * Anything that counts must ask for `withRelations` instead of using the list
+ * shape. The marker below is read by `assertMeasurable` so that mistake fails
+ * loudly rather than publishing a false number.
+ */
+/*
+ * The marker is a WeakSet rather than a property on the object.
+ *
+ * Attaching a symbol made the record non-plain, and React refuses to pass such
+ * an object from a Server Component to a Client Component — the home page list
+ * echoed "Objects with symbol properties like civiclens.pruned are not
+ * supported" for every card. A side table keeps the same signal without
+ * changing the shape of data that crosses the server/client boundary.
+ */
+const PRUNED = new WeakSet<object>();
+
 function pruneForList(decision: Decision): Decision {
-  return {
+  const pruned: Decision = {
     ...decision,
     summary: excerpt(decision.summary, 420),
     latestUpdate: excerpt(decision.latestUpdate, 280),
     sources: [],
     timeline: [],
   };
+  PRUNED.add(pruned);
+  return pruned;
+}
+
+/** True when a decision came from the pruned list shape rather than a full read. */
+export function isPrunedForList(decision: Decision): boolean {
+  return PRUNED.has(decision);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -234,12 +302,18 @@ function pruneForList(decision: Decision): Decision {
 /* -------------------------------------------------------------------------- */
 
 const baseListSelection =
-  "id,slug,title,organization,topic,status,summary,why_it_matters,latest_update,next_step,published_at,updated_at,approved_at,archived_at,last_checked_at,affected_roles,affected_zip_codes,affected_areas,important_dates,before_text,after_text,is_published,amount_usd,fiscal_year,funding_source,requester,deadline_date,deadline_label,deadline_source_url,deadline_origin,official_status";
+  "id,slug,title,organization,topic,status,summary,why_it_matters,latest_update,next_step,published_at,updated_at,approved_at,archived_at,last_checked_at,affected_roles,affected_zip_codes,affected_areas,important_dates,before_text,after_text,is_published,amount_usd,fiscal_year,funding_source,requester,deadline_date,deadline_label,deadline_source_url,deadline_origin,official_status,matter_key,appearance_ids,appearance_count,first_seen_at,last_activity_at";
 
-/** Columns added by the deadlines migration. */
-const SPINE_MISSING = /decision_geography|decision_drafts|amount_usd|requester|deadline_date|official_status/;
+/** Columns added by the spine, deadlines and matters migrations. */
+const SPINE_MISSING =
+  /decision_geography|decision_drafts|amount_usd|requester|deadline_date|official_status|matter_key/;
 
-const spineListSelection = `${baseListSelection},decision_geography(address,latitude,longitude,zip_code,council_district,neighborhood,method,confidence)`;
+const GEOGRAPHY_COLUMNS =
+  "address,latitude,longitude,zip_code,council_district,council_district_rep,council_district_rep_email," +
+  "county_district,county_district_rep,county_district_rep_email,school_board_district," +
+  "congressional_district,state_house_district,state_senate_district,acres,neighborhood,method,confidence";
+
+const spineListSelection = `${baseListSelection},decision_geography(${GEOGRAPHY_COLUMNS})`;
 
 const spineDetailSelection =
   "*, sources(*), timeline_events(*), decision_geography(*), decision_drafts(*)";
@@ -320,7 +394,13 @@ export async function getDecision(slugOrId: string): Promise<Decision | null> {
   const supabase = client();
   if (!supabase) {
     const local = await localDecisions();
-    const found = local.find((decision) => decision.slug === slugOrId || decision.id === slugOrId) || null;
+    const lookup = (value: string) =>
+      local.find((decision) => decision.slug === value || decision.id === value) ?? null;
+    let found = lookup(slugOrId);
+    if (!found) {
+      const alias = (await localAliases())[slugOrId];
+      if (alias) found = lookup(alias);
+    }
     if (!found) return null;
     const [withDrafts] = await applyLocalDrafts([found]);
     return withDrafts;
