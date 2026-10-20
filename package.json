@@ -12,6 +12,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "check": "pnpm typecheck && pnpm build",
     "test": "node --import tsx --test src/lib/*.test.ts src/ingestion/*.test.ts",
     "ingest": "node --env-file-if-exists=.env.local --import tsx scripts/ingest.ts",
     "ingest:local": "node --import tsx scripts/ingest-local.ts",

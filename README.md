@@ -1,5 +1,7 @@
 # CivicLens
 
+[![Build check](https://github.com/Congressional-App-Challenge-Group/CAC-App/actions/workflows/build-check.yml/badge.svg)](https://github.com/Congressional-App-Challenge-Group/CAC-App/actions/workflows/build-check.yml)
+
 CivicLens tracks source-backed decisions from the City of Charlotte, Mecklenburg County, and
 Charlotte-Mecklenburg Schools. Public pages read verified decisions, sources, and timelines from
 Supabase; there are no fictional fallback records.
@@ -271,4 +273,5 @@ counts, so a run that resolved nothing is visible rather than silent. When worki
 verify against an empty cache — `rm -rf .civiclens && FORCE_DATA_REFRESH=true pnpm ensure:data` —
 because that is exactly what a cold CI or Vercel container sees.
 
-CI (`.github/workflows/ci.yml`) runs typecheck and tests on every push and pull request.
+GitHub Actions runs CI (`.github/workflows/ci.yml`) and the production build check
+(`.github/workflows/build-check.yml`) on every pull request and every push to `main`.

@@ -8,6 +8,7 @@ const defaults: UserPreferences = { zipCode: "28205", roles: ["Other resident"],
 const PREFS_KEY = "civiclens-preferences";
 const FOLLOW_KEY = "civiclens-following";
 const FOLLOW_PLACE_KEY = "civiclens-following-places";
+const PERSONALIZED_KEY = "civiclens-personalization-complete";
 
 type Ctx = {
   preferences: UserPreferences;
@@ -25,6 +26,8 @@ type Ctx = {
   toggleFollowPlace: (key: string) => void;
   ready: boolean;
   source: "local" | "account";
+  personalized: boolean;
+  dismissPersonalization: () => void;
 };
 
 const PreferencesContext = createContext<Ctx | null>(null);
@@ -55,6 +58,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const [followingPlaces, setFollowingPlaces] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
   const [source, setSource] = useState<Ctx["source"]>("local");
+  const [personalized, setPersonalized] = useState(false);
 
   // True until the first hydration of the current profile has completed.
   const hydratedRef = useRef(false);
@@ -77,6 +81,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     const startGen = hydrationStartGenRef.current;
     let fresh = true;
     (async () => {
+      const completedOnDevice = safeGet<boolean>(PERSONALIZED_KEY) === true;
       if (accountMode) {
         const supabase = createSupabaseBrowserClient();
         const localPrefs = safeGet<UserPreferences>(PREFS_KEY);
@@ -101,11 +106,14 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
           // Union, so an account that predates the table keeps what is on the
           // device instead of having its watchlist silently emptied.
           setFollowingPlaces([...new Set([...remotePlaces, ...localPlaces])]);
+          setPersonalized(true);
+          safeSet(PERSONALIZED_KEY, true);
         } else {
           // New account: seed from any local guest preferences so nothing is lost.
           if (localPrefs) setP((prev) => ({ ...prev, ...localPrefs }));
           setFollowing(safeGet<string[]>(FOLLOW_KEY) ?? []);
           setFollowingPlaces(localPlaces);
+          setPersonalized(completedOnDevice);
         }
         setSource("account");
       } else {
@@ -116,6 +124,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         if (localPrefs) setP((prev) => ({ ...prev, ...localPrefs }));
         if (localFollows) setFollowing(localFollows);
         if (localPlaces) setFollowingPlaces(localPlaces);
+        setPersonalized(completedOnDevice);
         setSource("local");
       }
       if (!fresh) return;
@@ -155,7 +164,15 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     }
   }, [preferences, following, followingPlaces, ready, accountMode, userId]);
 
-  const setPreferences = useCallback((prefs: UserPreferences) => setP(prefs), []);
+  const setPreferences = useCallback((prefs: UserPreferences) => {
+    setP(prefs);
+    setPersonalized(true);
+    safeSet(PERSONALIZED_KEY, true);
+  }, []);
+  const dismissPersonalization = useCallback(() => {
+    setPersonalized(true);
+    safeSet(PERSONALIZED_KEY, true);
+  }, []);
   const toggleFollow = useCallback((id: string) => {
     setFollowing((old) => (old.includes(id) ? old.filter((x) => x !== id) : [...old, id]));
   }, []);
@@ -165,7 +182,18 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
 
   return (
     <PreferencesContext.Provider
-      value={{ preferences, setPreferences, following, toggleFollow, followingPlaces, toggleFollowPlace, ready, source }}
+      value={{
+        preferences,
+        setPreferences,
+        following,
+        toggleFollow,
+        followingPlaces,
+        toggleFollowPlace,
+        ready,
+        source,
+        personalized,
+        dismissPersonalization,
+      }}
     >
       {children}
     </PreferencesContext.Provider>

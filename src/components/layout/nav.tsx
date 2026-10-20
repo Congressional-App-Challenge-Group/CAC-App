@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Bot, Clock, Compass, FileWarning, Heart, Home, MapPin, Settings2, ShieldCheck } from "lucide-react";
+import { Activity, Clock, Compass, Heart, Home, LogIn, MapPin, UserRound } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { usePreferences } from "@/features/preferences/preferences";
 import { useSession } from "@/components/session-provider";
@@ -15,8 +15,6 @@ const desktopLinks = [
   { href: "/changes", label: "Changes", icon: Activity },
   { href: "/my-area", label: "My area", icon: MapPin },
   { href: "/following", label: "Following", icon: Heart },
-  { href: "/ask", label: "Ask", icon: Bot },
-  { href: "/evidence", label: "Evidence", icon: FileWarning },
 ];
 
 // Mobile keeps five slots, so it shows the two modes the product is built around
@@ -65,25 +63,25 @@ export function Header() {
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Link
-              href="/settings"
-              aria-label="Personalization settings"
-              className="settings-pill flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-extrabold shadow-sm transition-colors hover:bg-surface-2"
-            >
-              <Settings2 size={15} />
-              <span className="hidden sm:inline">{ready ? preferences.zipCode : "—"}</span>
-            </Link>
             {user ? (
               <Link
-                href="/admin"
-                title="Editorial workspace"
-                aria-label="Editorial workspace"
+                href="/settings"
+                title="Your CivicLens account"
+                aria-label="Your CivicLens account"
                 className="settings-pill flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-extrabold shadow-sm transition-colors hover:bg-surface-2"
               >
-                <ShieldCheck size={15} />
-                <span className="hidden sm:inline">Workspace</span>
+                <UserRound size={15} />
+                <span className="hidden sm:inline">{ready ? preferences.zipCode : "Account"}</span>
               </Link>
-            ) : null}
+            ) : (
+              <Link
+                href="/login"
+                className="settings-pill flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-extrabold shadow-sm transition-colors hover:bg-surface-2"
+              >
+                <LogIn size={15} />
+                <span className="hidden sm:inline">Sign in</span>
+              </Link>
+            )}
           </div>
         </div>
       </header>

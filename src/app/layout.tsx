@@ -11,6 +11,7 @@ import { DecisionsProvider } from "@/components/decisions-provider";
 import { SessionProvider } from "@/components/session-provider";
 import { PageMotion } from "@/components/ui/reveal";
 import { getDecisions } from "@/server/decisions";
+import { FirstVisitPersonalization } from "@/features/preferences/first-visit-personalization";
 
 export const metadata: Metadata = {
   title: {
@@ -66,6 +67,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <PageMotion />
                 <main id="main">{children}</main>
                 <Footer />
+                <FirstVisitPersonalization />
               </PlaceProvider>
             </PreferencesProvider>
           </DecisionsProvider>

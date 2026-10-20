@@ -3,7 +3,7 @@ import { LoginForm } from "@/features/auth/login-form";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata = {
-  title: "Editor sign in",
+  title: "Sign in",
   robots: { index: false, follow: false },
 };
 

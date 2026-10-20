@@ -7,5 +7,5 @@ export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient(cookieStore);
   if (supabase) await supabase.auth.signOut();
   const origin = request.headers.get("origin") || request.headers.get("referer") || "http://localhost:3000";
-  return NextResponse.redirect(new URL("/login", origin));
+  return NextResponse.redirect(new URL("/", origin));
 }
