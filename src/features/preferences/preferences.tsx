@@ -1,27 +1,28 @@
 "use client";
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import type { UserPreferences } from "@/types";
+
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useSession } from "@/components/session-provider";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
+import type { UserPreferences } from "@/types";
 
-const defaults: UserPreferences = { zipCode: "28205", roles: ["Other resident"], interests: ["Public transit", "Housing", "Parks"] };
-const PREFS_KEY = "civiclens-preferences";
-const FOLLOW_KEY = "civiclens-following";
-const FOLLOW_PLACE_KEY = "civiclens-following-places";
-const PERSONALIZED_KEY = "civiclens-personalization-complete";
+const DEFAULTS: UserPreferences = {
+  zipCode: "28205",
+  roles: ["Other resident"],
+  interests: ["Public transit", "Housing", "Parks"],
+};
 
-type Ctx = {
+const STORAGE = {
+  preferences: "civiclens-preferences",
+  decisions: "civiclens-following",
+  places: "civiclens-following-places",
+  personalized: "civiclens-personalization-complete",
+};
+
+type PreferencesContextValue = {
   preferences: UserPreferences;
-  setPreferences: (p: UserPreferences) => void;
+  setPreferences: (preferences: UserPreferences) => void;
   following: string[];
   toggleFollow: (id: string) => void;
-  /**
-   * Followed districts, as `kind:code` keys ("council:5").
-   *
-   * A place a resident follows is the same value as the place key in a shared
-   * link, so the watchlist and the district page cannot disagree about what
-   * "District 5" means.
-   */
   followingPlaces: string[];
   toggleFollowPlace: (key: string) => void;
   ready: boolean;
@@ -30,154 +31,165 @@ type Ctx = {
   dismissPersonalization: () => void;
 };
 
-const PreferencesContext = createContext<Ctx | null>(null);
+const PreferencesContext = createContext<PreferencesContextValue | null>(null);
 
-function safeGet<T>(key: string): T | null {
+function readStorage<T>(key: string): T | null {
   try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : null;
+    const value = localStorage.getItem(key);
+    return value ? (JSON.parse(value) as T) : null;
   } catch {
     return null;
   }
 }
-function safeSet(key: string, value: unknown) {
+
+function writeStorage(key: string, value: unknown) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    /* storage full or unavailable */
+    // The app still works if the browser blocks local storage.
   }
 }
 
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {
   const { user, loading: sessionLoading, enabled } = useSession();
   const userId = user?.id ?? null;
-  const accountMode = Boolean(userId && enabled && !sessionLoading);
+  const profileKey = userId ?? "guest";
 
-  const [preferences, setP] = useState<UserPreferences>(defaults);
+  const [preferences, setPreferenceState] = useState(DEFAULTS);
   const [following, setFollowing] = useState<string[]>([]);
   const [followingPlaces, setFollowingPlaces] = useState<string[]>([]);
-  const [ready, setReady] = useState(false);
-  const [source, setSource] = useState<Ctx["source"]>("local");
+  const [loadedProfile, setLoadedProfile] = useState<string | null>(null);
+  const [source, setSource] = useState<"local" | "account">("local");
   const [personalized, setPersonalized] = useState(false);
 
-  // True until the first hydration of the current profile has completed.
-  const hydratedRef = useRef(false);
-  // Which profile (userId or "guest") we hydrated, so a different account re-hydrates.
-  const hydratedForRef = useRef<string | null>(null);
-  // Monotonic generation counter: bumped when a hydration starts, snapshotted
-  // only once that hydration completes. Prevents persisting stale state from a
-  // previous profile under a new userId before the new profile is loaded.
-  const hydrationStartGenRef = useRef(0);
-  const hydrationDoneGenRef = useRef(0);
+  const ready = !sessionLoading && loadedProfile === profileKey;
 
-  // Hydrate once: account prefs when signed in, otherwise local guest prefs.
+  // Load local choices first. Signed-in users then get their saved cloud choices.
   useEffect(() => {
-    const profileKey = accountMode ? userId : "guest";
-    if (hydratedRef.current && hydratedForRef.current === profileKey) return;
-    hydratedRef.current = false;
-    hydratedForRef.current = profileKey;
-    // Mark a new hydration in flight so the persist effect stays quiet until it lands.
-    hydrationStartGenRef.current += 1;
-    const startGen = hydrationStartGenRef.current;
-    let fresh = true;
-    (async () => {
-      const completedOnDevice = safeGet<boolean>(PERSONALIZED_KEY) === true;
-      if (accountMode) {
-        const supabase = createSupabaseBrowserClient();
-        const localPrefs = safeGet<UserPreferences>(PREFS_KEY);
-        const [{ data: prefRow }, { data: followRows }, { data: placeRows }] = await Promise.all([
-          supabase.from("user_preferences").select("*").eq("user_id", userId).maybeSingle(),
-          supabase.from("decision_follows").select("decision_id").eq("user_id", userId),
-          // A failure here is tolerated rather than fatal: the migration may not
-          // have been applied yet, and losing place follows should not stop the
-          // rest of the profile from loading.
-          supabase.from("place_follows").select("place_key").eq("user_id", userId),
-        ]);
-        if (!fresh) return;
-        const localPlaces = safeGet<string[]>(FOLLOW_PLACE_KEY) ?? [];
-        if (prefRow) {
-          setP({
-            zipCode: prefRow.zip_code || defaults.zipCode,
-            roles: prefRow.roles ?? defaults.roles,
-            interests: prefRow.interests ?? defaults.interests,
-          });
-          setFollowing((followRows ?? []).map((r) => r.decision_id as string));
-          const remotePlaces = (placeRows ?? []).map((r) => r.place_key as string);
-          // Union, so an account that predates the table keeps what is on the
-          // device instead of having its watchlist silently emptied.
-          setFollowingPlaces([...new Set([...remotePlaces, ...localPlaces])]);
-          setPersonalized(true);
-          safeSet(PERSONALIZED_KEY, true);
-        } else {
-          // New account: seed from any local guest preferences so nothing is lost.
-          if (localPrefs) setP((prev) => ({ ...prev, ...localPrefs }));
-          setFollowing(safeGet<string[]>(FOLLOW_KEY) ?? []);
-          setFollowingPlaces(localPlaces);
-          setPersonalized(completedOnDevice);
-        }
-        setSource("account");
-      } else {
-        const localPrefs = safeGet<UserPreferences>(PREFS_KEY);
-        const localFollows = safeGet<string[]>(FOLLOW_KEY);
-        const localPlaces = safeGet<string[]>(FOLLOW_PLACE_KEY);
-        if (!fresh) return;
-        if (localPrefs) setP((prev) => ({ ...prev, ...localPrefs }));
-        if (localFollows) setFollowing(localFollows);
-        if (localPlaces) setFollowingPlaces(localPlaces);
-        setPersonalized(completedOnDevice);
+    if (sessionLoading) return;
+
+    let cancelled = false;
+    setLoadedProfile(null);
+
+    async function loadProfile() {
+      const localPreferences = readStorage<UserPreferences>(STORAGE.preferences);
+      const localFollowing = readStorage<string[]>(STORAGE.decisions) ?? [];
+      const localPlaces = readStorage<string[]>(STORAGE.places) ?? [];
+      const completed = readStorage<boolean>(STORAGE.personalized) === true;
+
+      if (!userId || !enabled) {
+        if (cancelled) return;
+        setPreferenceState(localPreferences ?? DEFAULTS);
+        setFollowing(localFollowing);
+        setFollowingPlaces(localPlaces);
+        setPersonalized(completed);
         setSource("local");
+        setLoadedProfile("guest");
+        return;
       }
-      if (!fresh) return;
-      hydratedRef.current = true;
-      hydrationDoneGenRef.current = Math.max(hydrationDoneGenRef.current, startGen);
-      setReady(true);
-    })();
-    return () => {
-      fresh = false;
-    };
-  }, [accountMode, userId]);
 
-  // Persist on every change once the current profile's hydration has completed.
-  // The generation guard prevents a stale write from a prior/previous account.
-  useEffect(() => {
-    const currentStart = hydrationStartGenRef.current;
-    const currentDone = hydrationDoneGenRef.current;
-    if (!ready || currentDone < currentStart) return;
-    safeSet(PREFS_KEY, preferences);
-    safeSet(FOLLOW_KEY, following);
-    safeSet(FOLLOW_PLACE_KEY, followingPlaces);
-    if (!accountMode) return;
-    const supabase = createSupabaseBrowserClient();
-    void supabase
-      .from("user_preferences")
-      .upsert(
-        { user_id: userId, zip_code: preferences.zipCode, roles: preferences.roles, interests: preferences.interests, updated_at: new Date().toISOString() },
-        { onConflict: "user_id" }
+      const supabase = createSupabaseBrowserClient();
+      const [preferenceResult, decisionResult, placeResult] = await Promise.all([
+        supabase.from("user_preferences").select("*").eq("user_id", userId).maybeSingle(),
+        supabase.from("decision_follows").select("decision_id").eq("user_id", userId),
+        supabase.from("place_follows").select("place_key").eq("user_id", userId),
+      ]);
+
+      if (cancelled) return;
+
+      const row = preferenceResult.data;
+      if (row) {
+        setPreferenceState({
+          zipCode: row.zip_code || DEFAULTS.zipCode,
+          roles: row.roles ?? DEFAULTS.roles,
+          interests: row.interests ?? DEFAULTS.interests,
+        });
+        setPersonalized(true);
+        writeStorage(STORAGE.personalized, true);
+      } else {
+        setPreferenceState(localPreferences ?? DEFAULTS);
+        setPersonalized(completed);
+      }
+
+      setFollowing(
+        decisionResult.data?.map((item) => item.decision_id as string) ?? localFollowing,
       );
-    void supabase.from("decision_follows").delete().eq("user_id", userId);
-    if (following.length) {
-      void supabase.from("decision_follows").insert(following.map((decisionId) => ({ user_id: userId, decision_id: decisionId })));
-    }
-    void supabase.from("place_follows").delete().eq("user_id", userId);
-    if (followingPlaces.length) {
-      void supabase.from("place_follows").insert(followingPlaces.map((placeKey) => ({ user_id: userId, place_key: placeKey })));
-    }
-  }, [preferences, following, followingPlaces, ready, accountMode, userId]);
 
-  const setPreferences = useCallback((prefs: UserPreferences) => {
-    setP(prefs);
+      const cloudPlaces = placeResult.data?.map((item) => item.place_key as string) ?? [];
+      setFollowingPlaces([...new Set([...cloudPlaces, ...localPlaces])]);
+      setSource("account");
+      setLoadedProfile(userId);
+    }
+
+    void loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, profileKey, sessionLoading, userId]);
+
+  // Save every change locally. If signed in, also sync it to Supabase.
+  useEffect(() => {
+    if (!ready) return;
+
+    writeStorage(STORAGE.preferences, preferences);
+    writeStorage(STORAGE.decisions, following);
+    writeStorage(STORAGE.places, followingPlaces);
+
+    if (!userId || !enabled) return;
+
+    async function syncAccount() {
+      const supabase = createSupabaseBrowserClient();
+
+      await supabase.from("user_preferences").upsert(
+        {
+          user_id: userId,
+          zip_code: preferences.zipCode,
+          roles: preferences.roles,
+          interests: preferences.interests,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" },
+      );
+
+      await supabase.from("decision_follows").delete().eq("user_id", userId);
+      if (following.length) {
+        await supabase.from("decision_follows").insert(
+          following.map((decisionId) => ({ user_id: userId, decision_id: decisionId })),
+        );
+      }
+
+      await supabase.from("place_follows").delete().eq("user_id", userId);
+      if (followingPlaces.length) {
+        await supabase.from("place_follows").insert(
+          followingPlaces.map((placeKey) => ({ user_id: userId, place_key: placeKey })),
+        );
+      }
+    }
+
+    void syncAccount();
+  }, [enabled, following, followingPlaces, preferences, ready, userId]);
+
+  const setPreferences = useCallback((next: UserPreferences) => {
+    setPreferenceState(next);
     setPersonalized(true);
-    safeSet(PERSONALIZED_KEY, true);
+    writeStorage(STORAGE.personalized, true);
   }, []);
+
   const dismissPersonalization = useCallback(() => {
     setPersonalized(true);
-    safeSet(PERSONALIZED_KEY, true);
+    writeStorage(STORAGE.personalized, true);
   }, []);
+
   const toggleFollow = useCallback((id: string) => {
-    setFollowing((old) => (old.includes(id) ? old.filter((x) => x !== id) : [...old, id]));
+    setFollowing((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    );
   }, []);
+
   const toggleFollowPlace = useCallback((key: string) => {
-    setFollowingPlaces((old) => (old.includes(key) ? old.filter((x) => x !== key) : [...old, key]));
+    setFollowingPlaces((current) =>
+      current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
+    );
   }, []);
 
   return (
@@ -200,8 +212,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   );
 }
 
-export const usePreferences = () => {
-  const value = useContext(PreferencesContext);
-  if (!value) throw new Error("PreferencesProvider missing");
-  return value;
-};
+export function usePreferences() {
+  const context = useContext(PreferencesContext);
+  if (!context) throw new Error("usePreferences must be inside PreferencesProvider");
+  return context;
+}

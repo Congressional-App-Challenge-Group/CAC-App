@@ -2,11 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 
-/**
- * Protects the /admin area. Uses @supabase/ssr to refresh the session cookie
- * on each request and redirects unauthenticated visitors to the login page.
- * Editor-role enforcement happens in the admin layout (server component).
- */
+// Only signed-in users can reach the admin pages.
 export async function middleware(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

@@ -27,16 +27,27 @@ export function FirstVisitPersonalization() {
     setSelectedInterests(preferences.interests);
   }, [personalized, preferences, ready]);
 
-  if (!ready || personalized || pathname.startsWith("/admin") || pathname === "/login" || pathname === "/onboarding") {
+  const hiddenPage =
+    pathname.startsWith("/admin") || pathname === "/login" || pathname === "/onboarding";
+
+  if (!ready || personalized || hiddenPage) {
     return null;
   }
 
   const toggleRole = (role: UserRole) => {
-    setSelectedRoles((current) => current.includes(role) ? current.filter((item) => item !== role) : [...current, role]);
+    setSelectedRoles((current) =>
+      current.includes(role) ? current.filter((item) => item !== role) : [...current, role],
+    );
   };
+
   const toggleInterest = (interest: string) => {
-    setSelectedInterests((current) => current.includes(interest) ? current.filter((item) => item !== interest) : [...current, interest]);
+    setSelectedInterests((current) =>
+      current.includes(interest)
+        ? current.filter((item) => item !== interest)
+        : [...current, interest],
+    );
   };
+
   const save = () => {
     if (!/^\d{5}$/.test(zipCode)) return setError("Enter a valid 5-digit ZIP code.");
     if (!selectedRoles.length) return setError("Choose at least one role.");
@@ -63,14 +74,17 @@ export function FirstVisitPersonalization() {
         </button>
 
         <div className="personalization-heading">
-          <span><Sparkles size={19} /></span>
+          <span>
+            <Sparkles size={19} />
+          </span>
           <div>
             <p>YOUR CIVICLENS</p>
             <h2 id="personalization-title">Make the public record relevant to you.</h2>
           </div>
         </div>
         <p id="personalization-description" className="personalization-intro">
-          Tell us only what helps. Guest preferences stay on this device, and a free account can sync them later.
+          Tell us only what helps. Guest preferences stay on this device, and a free account can
+          sync them later.
         </p>
 
         <label className="personalization-field">
@@ -86,21 +100,53 @@ export function FirstVisitPersonalization() {
 
         <fieldset className="personalization-group">
           <legend>I am a…</legend>
-          <div>{roles.map((role) => <button key={role} type="button" aria-pressed={selectedRoles.includes(role)} onClick={() => toggleRole(role)}>{role}</button>)}</div>
+          <div>
+            {roles.map((role) => (
+              <button
+                key={role}
+                type="button"
+                aria-pressed={selectedRoles.includes(role)}
+                onClick={() => toggleRole(role)}
+              >
+                {role}
+              </button>
+            ))}
+          </div>
         </fieldset>
 
         <fieldset className="personalization-group">
           <legend>I care about…</legend>
-          <div>{interests.map((interest) => <button key={interest} type="button" aria-pressed={selectedInterests.includes(interest)} onClick={() => toggleInterest(interest)}>{interest}</button>)}</div>
+          <div>
+            {interests.map((interest) => (
+              <button
+                key={interest}
+                type="button"
+                aria-pressed={selectedInterests.includes(interest)}
+                onClick={() => toggleInterest(interest)}
+              >
+                {interest}
+              </button>
+            ))}
+          </div>
         </fieldset>
 
-        {error ? <p className="personalization-error" role="alert">{error}</p> : null}
+        {error ? (
+          <p className="personalization-error" role="alert">
+            {error}
+          </p>
+        ) : null}
 
         <div className="personalization-actions">
           <button type="button" className="personalization-save" onClick={save}>
             <Check size={17} /> Personalize my CivicLens
           </button>
-          <button type="button" className="personalization-skip" onClick={dismissPersonalization}>Use the standard view</button>
+          <button
+            type="button"
+            className="personalization-skip"
+            onClick={dismissPersonalization}
+          >
+            Use the standard view
+          </button>
         </div>
       </section>
     </div>

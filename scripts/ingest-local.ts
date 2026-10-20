@@ -7,98 +7,130 @@ import { orgNames } from "../src/lib/civic";
 import type { Decision, TimelineEvent } from "../src/types";
 import type { NormalizedItem, SourceConfig } from "../src/ingestion/types";
 
-const lookback = Number(process.env.INGEST_LOOKBACK_DAYS || 365);
-const lookforward = Number(process.env.INGEST_LOOKFORWARD_DAYS || 90);
-const since = new Date(Date.now() - lookback * 86_400_000).toISOString().slice(0, 10);
-const until = new Date(Date.now() + lookforward * 86_400_000).toISOString().slice(0, 10);
-const output = resolve(process.cwd(), ".civiclens/local-decisions.json");
+const lookbackDays = Number(process.env.INGEST_LOOKBACK_DAYS || 365);
+const lookforwardDays = Number(process.env.INGEST_LOOKFORWARD_DAYS || 90);
+const since = new Date(Date.now() - lookbackDays * 86_400_000).toISOString().slice(0, 10);
+const until = new Date(Date.now() + lookforwardDays * 86_400_000).toISOString().slice(0, 10);
+const outputFile = resolve(process.cwd(), ".civiclens/local-decisions.json");
 const sources = governmentSources.filter((source) => source.kind === "legistar");
 
+type ItemGroup = {
+  source: SourceConfig;
+  items: NormalizedItem[];
+};
+
 async function main() {
-  const groups = new Map<string, { source: SourceConfig; items: NormalizedItem[] }>();
+  const groups = await collectItems();
+  const decisions = [...groups].map(([key, group]) => makeDecision(key, group));
+
+  // Keep open decisions and recently completed decisions.
+  const activeDecisions = decisions
+    .filter(
+      (decision) =>
+        !decision.approvedAt ||
+        Date.now() - new Date(decision.approvedAt).getTime() <= 60 * 86_400_000,
+    )
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+
+  await mkdir(dirname(outputFile), { recursive: true });
+  await writeFile(outputFile, JSON.stringify(activeDecisions, null, 2));
+
+  const historyCount = activeDecisions.filter((decision) => decision.timeline.length > 1).length;
+  console.log(
+    `Local cache: ${activeDecisions.length} active decisions; ` +
+      `${historyCount} include multi-event history from ${sources.length} sources.`,
+  );
+}
+
+async function collectItems() {
+  const groups = new Map<string, ItemGroup>();
+
   for (const source of sources) {
     const result = await collectLegistar(source, since, until);
+
     for (const item of result.items) {
       const key = `${source.key}:${item.entityId}`;
-      const group = groups.get(key) || { source, items: [] };
+      const group = groups.get(key) ?? { source, items: [] };
       group.items.push(item);
       groups.set(key, group);
     }
   }
 
-  const decisions: Decision[] = [];
-  for (const [key, { source, items }] of groups) {
-    const ordered = [...items].sort((a, b) => a.eventDate.localeCompare(b.eventDate));
-    const latest = ordered.at(-1)!;
-    const id = key;
-    const completed = ["Approved", "Rejected", "Completed"].includes(latest.status);
-    const seen = new Set<string>();
-    const timeline: TimelineEvent[] = ordered
-      .filter((item) => {
-        const eventKey = `${item.eventDate}:${item.status}:${item.actionText || item.body}`;
-        if (seen.has(eventKey)) return false;
-        seen.add(eventKey);
-        return true;
-      })
-      .map((item, index, array) => ({
-        id: `${id}:${item.externalId}:${item.status}`,
-        decisionId: id,
-        date: item.eventDate,
-        stage: item.status,
-        title: item.actionText || stageTitle(item.status, index === 0),
-        description: item.body || item.title,
-        whatChanged: index === 0 ? "This item entered the tracked public record." : `The official record moved this item to ${item.status}.`,
-        state: index === array.length - 1 && !completed ? "current" : "completed",
-        verificationStatus: "verified",
-      }));
+  return groups;
+}
 
-    const first = ordered[0];
-    const uniqueSources = [...new Map(ordered.map((item) => [item.url, item])).values()].map((item, index) => ({
-      id: `${id}-source-${index}`,
-      decisionId: id,
-      title: `${orgNames[item.organization]} official meeting record`,
-      organization: orgNames[item.organization],
-      url: item.url,
-      publishedAt: item.eventDate,
-      lastVerifiedAt: new Date().toISOString(),
-      verificationStatus: "verified" as const,
-    }));
+function makeDecision(id: string, group: ItemGroup): Decision {
+  const ordered = [...group.items].sort((a, b) => a.eventDate.localeCompare(b.eventDate));
+  const first = ordered[0];
+  const latest = ordered.at(-1)!;
+  const completed = ["Approved", "Rejected", "Completed"].includes(latest.status);
 
-    decisions.push({
-      id,
-      slug: `${source.organization}-${latest.entityId}-${slugify(latest.title)}`,
-      title: latest.title,
-      organization: latest.organization,
-      topic: latest.topic,
-      status: latest.status,
-      summary: latest.body || latest.title,
-      whyItMatters: "This item was identified as a substantive action in an official government meeting record.",
-      latestUpdate: `${latest.eventDate}: ${latest.status}. ${latest.body || ""}`,
-      nextStep: latest.status === "Under review" ? "Under review by government body" : null,
-      sources: uniqueSources,
-      timeline,
-      importantDates: [{ date: latest.eventDate, label: "Under review" }],
-      affectedRoles: [],
-      affectedAreas: [],
-      affectedZipCodes: [],
-      requester: undefined,
-      money: undefined,
-      geography: undefined,
-      deadline: undefined,
-      approvedAt: completed ? latest.eventDate : undefined,
-      lastCheckedAt: new Date().toISOString(),
-      publishedAt: latest.eventDate,
-      updatedAt: new Date().toISOString(),
-      isPublished: true,
-      plainLanguageApproved: false,
-      beforeText: undefined,
-      afterText: undefined,
-    });
-  }
+  const timeline = makeTimeline(id, ordered, completed);
+  const uniqueItems = [...new Map(ordered.map((item) => [item.url, item])).values()];
+  const sources = uniqueItems.map((item, index) => ({
+    id: `${id}-source-${index}`,
+    decisionId: id,
+    title: `${orgNames[item.organization]} official meeting record`,
+    organization: orgNames[item.organization],
+    url: item.url,
+    publishedAt: item.eventDate,
+    lastVerifiedAt: new Date().toISOString(),
+    verificationStatus: "verified" as const,
+  }));
 
-  await mkdir(dirname(output), { recursive: true });
-  await writeFile(output, JSON.stringify(decisions, null, 2));
-  console.log(`Local cache: ${decisions.length} active decisions; ${decisions.filter((d) => d.timeline.length > 1).length} include multi-event history from ${sources.length} sources.`);
+  return {
+    id,
+    slug: `${group.source.organization}-${latest.entityId}-${slugify(latest.title)}`,
+    title: latest.title,
+    organization: latest.organization,
+    topic: latest.topic,
+    status: latest.status,
+    summary: latest.body || latest.title,
+    whyItMatters:
+      "This item was identified as a substantive action in an official government meeting record.",
+    latestUpdate: latest.actionText || `${latest.status} as of ${latest.eventDate}.`,
+    nextStep:
+      latest.status === "Scheduled for vote"
+        ? `Scheduled government action on ${latest.eventDate}.`
+        : null,
+    publishedAt: `${first.eventDate}T12:00:00Z`,
+    updatedAt: `${latest.eventDate}T12:00:00Z`,
+    approvedAt: completed ? `${latest.eventDate}T12:00:00Z` : null,
+    archivedAt: null,
+    lastCheckedAt: new Date().toISOString(),
+    affectedRoles: [],
+    affectedZipCodes: [],
+    affectedAreas: [],
+    importantDates: [{ date: latest.eventDate, label: latest.status }],
+    isPublished: true,
+    timeline,
+    sources,
+  };
+}
+
+function makeTimeline(id: string, items: NormalizedItem[], completed: boolean): TimelineEvent[] {
+  const seen = new Set<string>();
+  const uniqueItems = items.filter((item) => {
+    const key = `${item.eventDate}:${item.status}:${item.actionText || item.body}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return uniqueItems.map((item, index) => ({
+    id: `${id}:${item.externalId}:${item.status}`,
+    decisionId: id,
+    date: item.eventDate,
+    stage: item.status,
+    title: item.actionText || stageTitle(item.status, index === 0),
+    description: item.body || item.title,
+    whatChanged:
+      index === 0
+        ? "This item entered the tracked public record."
+        : `The official record moved this item to ${item.status}.`,
+    state: index === uniqueItems.length - 1 && !completed ? "current" : "completed",
+    verificationStatus: "verified",
+  }));
 }
 
 function stageTitle(status: string, first: boolean) {
