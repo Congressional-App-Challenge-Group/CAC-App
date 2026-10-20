@@ -1,20 +1,11 @@
-import { Brief } from "@/features/brief/brief";
-import { Masthead } from "@/features/brief/masthead";
-import { getRecentChanges } from "@/server/decisions";
+import { Observatory } from "@/features/brief/observatory";
+import { getObservatoryStory, getRecentChanges } from "@/server/decisions";
 
 export default async function Home() {
-  const changes = await getRecentChanges({ limit: 60 });
-  const weekAgo = Date.now() - 7 * 86_400_000;
-  const changedThisWeek = changes.filter(
-    (change) => new Date(change.changedAt).getTime() >= weekAgo,
-  ).length;
+  const [changes, story] = await Promise.all([
+    getRecentChanges({ limit: 60 }),
+    getObservatoryStory(),
+  ]);
 
-  return (
-    <>
-      <Masthead changedThisWeek={changedThisWeek} />
-      <div className="shell py-12 md:py-16">
-        <Brief changes={changes} />
-      </div>
-    </>
-  );
+  return <Observatory changes={changes} story={story} />;
 }

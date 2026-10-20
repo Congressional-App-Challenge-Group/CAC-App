@@ -50,13 +50,15 @@ export function PageHeader({
   aside?: ReactNode;
 }) {
   return (
-    <div className="grid gap-8 md:grid-cols-[1fr_auto] md:items-end">
-      <div className="max-w-3xl">
-        {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-        <h1 className="mt-3 display-1 text-ink">{title}</h1>
-        {description ? <p className="mt-5 reading md:text-lg">{description}</p> : null}
+    <header className="page-heading">
+      <div className="page-heading__inner">
+        <div className="page-heading__copy max-w-3xl">
+          {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
+          <h1 className="mt-3 display-1 text-ink">{title}</h1>
+          {description ? <p className="mt-5 reading md:text-lg">{description}</p> : null}
+        </div>
+        {aside ? <div className="page-heading__aside">{aside}</div> : null}
       </div>
-      {aside}
-    </div>
+    </header>
   );
 }

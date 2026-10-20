@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./editorial.css";
 import { Analytics } from "@vercel/analytics/next";
 import { Header } from "@/components/layout/nav";
 import { Footer } from "@/components/layout/footer";
@@ -8,6 +9,7 @@ import { PlaceProvider } from "@/features/place/place";
 import { PwaRegister } from "@/components/pwa-register";
 import { DecisionsProvider } from "@/components/decisions-provider";
 import { SessionProvider } from "@/components/session-provider";
+import { PageMotion } from "@/components/ui/reveal";
 import { getDecisions } from "@/server/decisions";
 
 export const metadata: Metadata = {
@@ -17,11 +19,15 @@ export const metadata: Metadata = {
   },
   description:
     "Track decisions from Charlotte, Mecklenburg County and Charlotte-Mecklenburg Schools. Every claim links to the official government record.",
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+  },
   manifest: "/manifest.webmanifest",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#102a26",
+  themeColor: "#090a0b",
   width: "device-width",
   initialScale: 1,
 };
@@ -33,10 +39,11 @@ export const viewport: Viewport = {
  */
 export const revalidate = 300;
 
-const themeScript = `(()=>{try{const saved=localStorage.getItem('civiclens-theme');const theme=saved==='light'||saved==='dark'?saved:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme}catch{}})()`;
+const themeScript = `(()=>{try{const saved=localStorage.getItem('civiclens-theme');const theme=saved==='light'||saved==='dark'?saved:'dark';document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme;document.querySelector('meta[name="theme-color"]')?.setAttribute('content',theme==='dark'?'#090a0b':'#eae0cb')}catch{document.documentElement.dataset.theme='dark';document.documentElement.style.colorScheme='dark'}})()`;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const decisions = await getDecisions();
+  const isVercelDeployment = process.env.VERCEL === "1";
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -56,13 +63,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 Skip to content
               </a>
                 <Header />
+                <PageMotion />
                 <main id="main">{children}</main>
                 <Footer />
               </PlaceProvider>
             </PreferencesProvider>
           </DecisionsProvider>
         </SessionProvider>
-        <Analytics />
+        {isVercelDeployment ? <Analytics /> : null}
       </body>
     </html>
   );

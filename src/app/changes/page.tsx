@@ -48,11 +48,18 @@ export default async function ChangesPage() {
         }
       />
 
-      <div className="mt-10 space-y-12">
+      <div className="changes-index" aria-label="Movement log summary">
+        <div><span>DECISIONS MOVED</span><strong>{groups.length.toLocaleString("en-US")}</strong></div>
+        <div><span>OFFICIAL CHANGES</span><strong>{changes.length.toLocaleString("en-US")}</strong></div>
+        <div><span>DAYS IN THE LOG</span><strong>{byDay.size.toLocaleString("en-US")}</strong></div>
+        <p>Each entry is compared with the prior official record.</p>
+      </div>
+
+      <div className="changes-feed">
         {groups.length ? (
           [...byDay.entries()].map(([day, dayGroups]) => (
-            <section key={day}>
-              <h2 className="mb-4 flex items-center gap-3 text-sm font-extrabold uppercase tracking-[0.1em] text-subtle">
+            <section className="changes-day" key={day}>
+              <h2 className="changes-day__heading mb-4 flex items-center gap-3 text-sm font-extrabold uppercase tracking-[0.1em] text-subtle">
                 {day}
                 <span className="h-px flex-1 bg-line" aria-hidden="true" />
                 <span className="text-civic">

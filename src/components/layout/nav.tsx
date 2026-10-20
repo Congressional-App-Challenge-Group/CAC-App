@@ -43,7 +43,7 @@ export function Header() {
               <span className="block text-lg font-black leading-none tracking-[-0.04em] text-ink">
                 CivicLens
               </span>
-              <span className="mt-1 block text-[9px] font-bold uppercase tracking-[0.17em] text-subtle">
+              <span className="brand-region mt-1 block font-bold uppercase text-subtle">
                 Charlotte–Mecklenburg
               </span>
             </span>

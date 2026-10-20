@@ -1,2 +1,26 @@
-import{ExploreClient}from"@/features/search/explore-client";
-export default function ExplorePage(){return <div className="shell py-10 md:py-14"><div className="max-w-3xl"><p className="eyebrow">Public decision tracker</p><h1 className="mt-3 text-4xl font-black leading-none tracking-[-.055em] md:text-6xl">Explore what’s changing.</h1><p className="mt-5 text-base leading-7 text-muted md:text-lg">Search active decisions across Charlotte and Mecklenburg. Filter by government body, topic, or where each item stands.</p></div><ExploreClient/></div>}
+import { ExploreClient } from "@/features/search/explore-client";
+import { PageHeader } from "@/components/ui/section";
+
+export default async function ExplorePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const initialQuery = typeof params.q === "string" ? params.q : "";
+  const initialTopic = typeof params.topic === "string" ? params.topic : "";
+  const initialQuick = typeof params.quick === "string" ? params.quick : "";
+
+  return (
+    <div className="explore-page">
+      <div className="shell">
+        <PageHeader
+          eyebrow="The public index · 01"
+          title="Find the decision behind the change."
+          description="Search Charlotte and Mecklenburg records by place, project, or issue. Every result leads back to what the government actually published."
+        />
+        <ExploreClient initialQuery={initialQuery} initialTopic={initialTopic} initialQuick={initialQuick} />
+      </div>
+    </div>
+  );
+}

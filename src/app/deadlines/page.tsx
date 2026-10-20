@@ -146,10 +146,23 @@ export default async function DeadlinesPage() {
   return (
     <div className="shell py-10 md:py-14">
       <PageHeader
-        eyebrow="On the clock"
+        eyebrow="On the clock · The published agenda"
         title="What's about to be decided"
         description="A tracker tells you what happened. This tells you what still can be changed — every item below has a date the official record itself states, and none of them is guessed."
+        aside={
+          <div className="deadline-count" aria-label={`${scheduled.length} published dates across ${open.length} open items`}>
+            <span>NEXT ACTIONS / VERIFIED</span>
+            <strong>{scheduled.length.toLocaleString("en-US")}</strong>
+            <p>published dates<br />across {open.length.toLocaleString("en-US")} open items</p>
+          </div>
+        }
       />
+
+      <div className="deadline-overview" aria-label="Deadline overview">
+        <div className="deadline-overview__lead"><span>ON THE PUBLIC CALENDAR</span><strong>{scheduled.length.toLocaleString("en-US")}</strong><p>items with a decision scheduled</p></div>
+        <div><span>HAPPENING TODAY</span><strong>{scheduled.filter((item) => item.urgency === "today").length.toLocaleString("en-US")}</strong><p>on an official agenda</p></div>
+        <div><span>OPEN / NO DATE GIVEN</span><strong>{undated.length.toLocaleString("en-US")}</strong><p>the record has not said when</p></div>
+      </div>
 
       {scheduled.length ? (
         <div className="mt-10 space-y-10">
@@ -170,7 +183,7 @@ export default async function DeadlinesPage() {
                   </span>
                 </div>
                 <p className="mt-2 max-w-2xl text-sm text-muted">{band.blurb}</p>
-                <ul className="card mt-4 overflow-hidden p-0">
+                <ul className={`deadline-list deadline-list--${band.key} mt-4 overflow-hidden p-0`}>
                   {bandItems.map((item) => (
                     <Row key={item.decision.id} item={item} />
                   ))}
@@ -204,7 +217,7 @@ export default async function DeadlinesPage() {
             listed so the date is not mistaken for a decision pending, and so the record is not
             emptier than it is.
           </p>
-          <ul className="card mt-4 overflow-hidden p-0">
+          <ul className="deadline-list mt-4 overflow-hidden p-0">
             {briefed.map((item) => (
               <Row key={item.decision.id} item={item} />
             ))}

@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import type {
   CivicSource,
   Decision,
+  ObservatoryStory,
   DecisionChange,
   DecisionDeadline,
   DecisionDraft,
@@ -432,6 +433,118 @@ export async function getDecision(slugOrId: string): Promise<Decision | null> {
 }
 
 /** Recently detected changes, newest first. */
+export async function getObservatoryStory(): Promise<ObservatoryStory | null> {
+  const all = await getDecisions({ withRelations: true, limit: 1000 });
+  const featured = all
+    .filter((decision) =>
+      decision.sources.some((source) => source.verificationStatus === "verified" && Boolean(source.url)) &&
+      decision.timeline.some((event) => event.verificationStatus === "verified") &&
+      decision.geography?.confidence === "exact" &&
+      Number.isFinite(decision.geography.latitude) &&
+      Number.isFinite(decision.geography.longitude),
+    )
+    .sort((a, b) => {
+      const storyScore = (decision: Decision) => {
+        const verified = decision.timeline.filter((event) => event.verificationStatus === "verified");
+        const stages = new Set(verified.map((event) => event.stage)).size;
+        const dates = new Set(verified.map((event) => event.date)).size;
+        return stages * 100 + dates * 10 + verified.length;
+      };
+      return storyScore(b) - storyScore(a) || b.updatedAt.localeCompare(a.updatedAt);
+    })[0];
+
+  const source = featured?.sources.find((entry) => entry.verificationStatus === "verified" && Boolean(entry.url));
+  if (!featured || !source) return null;
+  const verifiedTimeline = featured.timeline
+    .filter((event) => event.verificationStatus === "verified")
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const storyTimeline = verifiedTimeline;
+  const latestRecordedEvent = [...verifiedTimeline].reverse().find((event) => event.title !== "First tracked appearance");
+  const currentStoryDate = featured.deadline?.date && featured.deadline.date >= new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date()) ? featured.deadline.date : undefined;
+  const storySource = latestRecordedEvent?.sourceId
+    ? featured.sources.find((entry) => entry.id === latestRecordedEvent.sourceId) ?? source
+    : source;
+  const boundaryKind = featured.organization === "charlotte" ? "council" : "county";
+
+  const related = all
+    .filter((decision) => decision.id !== featured.id && decision.organization === featured.organization && decision.topic === featured.topic)
+    .slice(0, 3)
+    .map(({ slug, title, organization, status }) => ({ slug, title, organization, status }));
+
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+  const deadlines = all
+    .filter((decision) =>
+      decision.deadline?.date &&
+      decision.deadline.date >= today &&
+      decision.sources.some((entry) => entry.verificationStatus === "verified" && Boolean(entry.url)),
+    )
+    .sort((a, b) => (a.deadline?.date ?? "").localeCompare(b.deadline?.date ?? ""))
+    .slice(0, 4)
+    .map((decision) => {
+      const recordSource = decision.sources.find((entry) => entry.verificationStatus === "verified" && Boolean(entry.url));
+      return {
+        slug: decision.slug,
+        title: decision.title,
+        organization: decision.organization,
+        status: decision.status,
+        date: decision.deadline!.date!,
+        label: decision.deadline!.label ?? decision.deadline!.officialStatus ?? decision.status,
+        sourceUrl: decision.deadline!.sourceUrl ?? recordSource?.url,
+        sourceTitle: recordSource?.title,
+        scope: decision.geography?.confidence === "exact"
+          ? [decision.geography.zipCode ? `ZIP ${decision.geography.zipCode}` : undefined,
+              decision.geography.councilDistrict ? `City Council District ${decision.geography.councilDistrict}` : undefined]
+              .filter(Boolean).join(" · ") || undefined
+          : undefined,
+      };
+    });
+
+  let district: ObservatoryStory["district"];
+  try {
+    const artifact = JSON.parse(await readFile(resolve(process.cwd(), ".civiclens", "place-boundaries.json"), "utf8")) as {
+      source?: string;
+      boundaries?: { kind: string; code: string; label: string; sourceUrl?: string; rings: number[][][] }[];
+    };
+    const boundary = artifact.boundaries?.find((entry) =>
+      entry.kind === boundaryKind && String(boundaryKind === "council" ? featured.geography?.councilDistrict : featured.geography?.countyDistrict) === entry.code,
+    );
+    if (boundary) district = {
+      kind: boundary.kind,
+      code: boundary.code,
+      label: boundary.label,
+      sourceUrl: boundary.sourceUrl,
+      rings: boundary.rings,
+    };
+  } catch {
+    // The story remains useful without local boundary polygons.
+  }
+
+  return {
+    featured: {
+      id: featured.id,
+      slug: featured.slug,
+      title: featured.title,
+      organization: featured.organization,
+      topic: featured.topic,
+      status: featured.status,
+      summary: featured.summary,
+      latestUpdate: featured.latestUpdate,
+      deadline: featured.deadline,
+      geography: featured.geography,
+      source: storySource,
+      timeline: storyTimeline,
+      currentStoryDate,
+    },
+    related,
+    deadlines,
+    district,
+  };
+}
+
 export async function getRecentChanges(options: { days?: number; limit?: number } = {}): Promise<DecisionChange[]> {
   const limit = options.limit ?? 40;
   const supabase = client();

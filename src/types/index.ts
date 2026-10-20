@@ -322,7 +322,31 @@ export type Decision = {
   lastActivityAt?: string;
 };
 
+export type ObservatoryStory = {
+  featured: Pick<Decision, "id" | "slug" | "title" | "organization" | "topic" | "status" | "summary" | "latestUpdate" | "deadline" | "geography"> & {
+    source: CivicSource;
+    timeline: TimelineEvent[];
+    currentStoryDate?: string;
+  };
+  related: Pick<Decision, "slug" | "title" | "organization" | "status">[];
+  deadlines: (Pick<Decision, "slug" | "title" | "organization" | "status"> & {
+    date: string;
+    label: string;
+    sourceUrl?: string;
+    sourceTitle?: string;
+    scope?: string;
+  })[];
+  district?: {
+    kind: string;
+    code: string;
+    label: string;
+    sourceUrl?: string;
+    rings: number[][][];
+  };
+};
+
 export type UserPreferences = { zipCode: string; roles: UserRole[]; interests: string[] };
+
 
 export type CivicAssistantAnswer = {
   text: string;
