@@ -26,6 +26,9 @@ import { formatDeadlineDate, nextDeadline } from "@/lib/deadlines";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Note, Surface } from "@/components/ui/card";
 import { Stat } from "@/components/ui/stat";
+import { DocumentSummaryButton } from "@/features/ai/document-summary-button";
+import { DecisionComparisonButton } from "@/features/ai/decision-comparison-button";
+import { ImpactAnalysisButton } from "@/features/ai/impact-analysis-button";
 
 export const revalidate = 300;
 
@@ -168,8 +171,30 @@ export default async function DecisionPage({ params }: { params: Promise<{ slug:
 
           <p className="mt-6 max-w-3xl reading md:text-lg">{decision.summary}</p>
 
+          <div className="mt-5 flex flex-wrap gap-2">
+            <DocumentSummaryButton
+              decisionId={decision.id}
+              sourceId={decision.sources[0]?.id || ""}
+              sourceTitle={decision.sources[0]?.title || "Decision summary"}
+              variant="primary"
+            />
+            <DecisionComparisonButton
+              decisionId={decision.id}
+              variant="secondary"
+            />
+            <ImpactAnalysisButton
+              decisionId={decision.id}
+              variant="secondary"
+            />
+          </div>
+
           <div className="mt-7 max-w-2xl">
             <DeadlinePanel decision={decision} now={now} />
+          </div>
+
+          <div className="mt-6 rounded-[var(--radius-lg)] border border-line bg-surface-2 p-5">
+            <p className="eyebrow mb-2">Quick question about this decision?</p>
+            <AskBox decision={decision} compact />
           </div>
 
           {!decision.plainLanguageApproved ? (
@@ -313,6 +338,11 @@ export default async function DecisionPage({ params }: { params: Promise<{ slug:
                       {source.pageReference ? ` · ${source.pageReference}` : ""} ·{" "}
                       {source.verificationStatus}
                     </p>
+                    <DocumentSummaryButton
+                      decisionId={decision.id}
+                      sourceId={source.id}
+                      sourceTitle={source.title}
+                    />
                   </li>
                 ))}
               </ul>

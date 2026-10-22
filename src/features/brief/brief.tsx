@@ -116,14 +116,14 @@ function ClockRow({
  * not an estimate.
  */
 function BeforeDecided({ decisions, now, zipCode }: { decisions: Decision[]; now: Date; zipCode: string }) {
-  const soon = useMemo(() => upcomingActions(decisions, { now, limit: 40 }), [decisions, now]);
+  const soon = useMemo(() => upcomingActions(decisions || [], { now, limit: 40 }), [decisions, now]);
   const near = useMemo(
-    () => soon.filter((item) => item.decision.geography?.zipCode === zipCode),
+    () => (soon || []).filter((item) => item.decision.geography?.zipCode === zipCode),
     [soon, zipCode],
   );
 
-  const shown = (near.length ? near : soon).slice(0, 6);
-  const thisWeek = soon.filter((item) => item.days <= 7).length;
+  const shown = (near.length ? near : soon || []).slice(0, 6);
+  const thisWeek = (soon || []).filter((item) => item.days <= 7).length;
 
   if (!shown.length) {
     return (
@@ -178,10 +178,10 @@ export function Brief({ changes }: { changes: DecisionChange[] }) {
   const decisions = useDecisions();
   const { preferences, ready } = usePreferences();
 
-  const changeGroups = useMemo(() => groupChangesByDecision(changes).slice(0, 3), [changes]);
+  const changeGroups = useMemo(() => groupChangesByDecision(changes || []).slice(0, 3), [changes]);
 
   const near = useMemo(() => {
-    const scored = decisions
+    const scored = (decisions || [])
       .map((decision) => ({
         decision,
         inZip: decision.geography?.zipCode === preferences.zipCode,
@@ -196,18 +196,18 @@ export function Brief({ changes }: { changes: DecisionChange[] }) {
 
   const awaiting = useMemo(
     () =>
-      decisions
+      (decisions || [])
         .filter((decision) => isOpenStatus(decision.status))
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
         .slice(0, 3),
     [decisions],
   );
 
   const closed = useMemo(
     () =>
-      decisions
+      (decisions || [])
         .filter((decision) => isDecidedStatus(decision.status))
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
         .slice(0, 3),
     [decisions],
   );
@@ -216,7 +216,7 @@ export function Brief({ changes }: { changes: DecisionChange[] }) {
   const now = useMemo(() => new Date(), []);
 
   const newest = useMemo(
-    () => [...decisions].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, 3),
+    () => [...(decisions || [])].sort((a, b) => (b.publishedAt || "").localeCompare(a.publishedAt || "")).slice(0, 3),
     [decisions],
   );
 
@@ -371,8 +371,8 @@ export function Brief({ changes }: { changes: DecisionChange[] }) {
             <div>
               <p className="font-extrabold text-ink">Follow what matters and we&apos;ll track it</p>
               <p className="mt-1 text-sm text-muted">
-                Follow any record to build your list. Notifications arrive once the movement engine
-                has new changes to report.
+                Follow any record to build your list. The watchlist compares the change log against
+                your last visit, tracked on this device — no email, no account needed.
               </p>
             </div>
           </div>

@@ -18,6 +18,10 @@ export async function POST(request: Request) {
   if (!question) {
     return NextResponse.json({ text: "Ask a question about a tracked decision.", citations: [] }, { status: 400 });
   }
-  const answer = await assistantService.answerQuestion({ question, decisionId: decisionId || undefined });
+  // Cross-record questions flow through the same service; `decisionId` narrows
+  // to one record when the UI supplies one, preserving the existing flow.
+  const answer = decisionId
+    ? await assistantService.answerQuestion({ question, decisionId })
+    : await assistantService.answerAcrossRecords({ question });
   return NextResponse.json(answer);
 }

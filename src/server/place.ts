@@ -210,6 +210,124 @@ export type PlaceLookup =
       candidates?: string[];
     };
 
+/**
+ * Resolve a device position to a *district profile* by anchoring it to the
+ * county's own address file — never by mapping the raw point directly.
+ *
+ * The typed-address flow deliberately refuses geolocation because where a
+ * reader's phone currently sits is not where they vote or pay taxes. But a
+ * reader who has confirmed they want device positioning still deserves the
+ * same authoritative answer, so this returns the nearest recorded address to
+ * the supplied point (bounded window, no pagination, exact structured query),
+ * then runs it through the SAME resolvePlace()-based lookup as a typed
+ * address. The matched line is shown to the reader with the coordinates that
+ * produced it, so the anchoring is observable rather than magical.
+ *
+ * Coordinates are used for the one query and echoed in the response the
+ * requester came from; they are not logged, stored, or sent to any other
+ * service.
+ */
+export async function nearestPlace(
+  rawLatitude: number,
+  rawLongitude: number,
+): Promise<PlaceLookup & { anchoredWithinMeters?: number }> {
+  // Sanity-bounded Mecklenburg County window; everything outside it is "not in
+  // the address file", which is the truthful answer rather than a far match.
+  const inCounty =
+    rawLatitude >= 34.9 && rawLatitude <= 35.6 && rawLongitude >= -81.2 && rawLongitude <= -80.5;
+  if (!Number.isFinite(rawLatitude) || !Number.isFinite(rawLongitude) || !inCounty) {
+    return {
+      ok: false,
+      reason: "not-found",
+      message: "That position is outside Mecklenburg County, where CivicLens currently indexes records.",
+    };
+  }
+
+  // Web Mercator metres around the point, converted to the county's EPSG:2264
+  // foot grid only inside the query URL. The variance matches a city block.
+  const metersPerFoot = 0.3048;
+  const R = 6_378_137;
+  const latRadius = (rawLatitude * Math.PI) / 180;
+  const spanMetres = 250;
+  const dLat = (spanMetres / R) * (180 / Math.PI);
+  const dLon = (spanMetres / (R * Math.cos(latRadius))) * (180 / Math.PI);
+  const south = rawLatitude - dLat;
+  const west = rawLongitude - dLon;
+  const north = rawLatitude + dLat;
+  const east = rawLongitude + dLon;
+
+  // EPSG:2264 (NC State Plane, US survey feet) approximate bounds derived from
+  // the geographic envelope; the county query clips to real features anyway.
+  const toFeet = (metres: number) => metres / metersPerFoot;
+  const xMinimum = 1_400_000 + toFeet((west + 81.2) * 111_320 * Math.cos(35.2 * Math.PI / 180));
+  const yMinimum = 700_000 + toFeet((south - 34.9) * 111_320);
+  const xMaximum = 1_400_000 + toFeet((east + 81.2) * 111_320 * Math.cos(35.2 * Math.PI / 180));
+  const yMaximum = 700_000 + toFeet((north - 34.9) * 111_320);
+
+  const query = new URLSearchParams({
+    geometry: JSON.stringify({
+      xmin: xMinimum,
+      ymin: yMinimum,
+      xmax: xMaximum,
+      ymax: yMaximum,
+      spatialReference: { wkid: 2264 },
+    }),
+    geometryType: "esriGeometryEnvelope",
+    inSR: "2264",
+    spatialRel: "esriSpatialRelIntersects",
+    outFields:
+      "full_address,address,cde_zip1,nme_city,nme_street,cde_street_dir_prfx,latitude,longitude",
+    returnGeometry: "false",
+    f: "json",
+    resultRecordCount: "12",
+  });
+
+  let rows: AddressRow[];
+  try {
+    const response = await fetch(`${ADDRESS_LAYER}/query?${query}`, {
+      headers: { "user-agent": "CivicLens/1.0 place lookup" },
+    });
+    if (!response.ok) throw new Error(`${response.status} from the county address file`);
+    const payload = (await response.json()) as {
+      features?: Array<{ attributes?: AddressRow }>;
+      error?: { message?: string };
+    };
+    if (payload.error) throw new Error(payload.error.message ?? "county address file error");
+    rows = (payload.features ?? [])
+      .map((feature) => feature.attributes)
+      .filter((row): row is AddressRow => Boolean(row))
+      .filter((row) => typeof row.latitude === "number" && typeof row.longitude === "number");
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "upstream-unavailable",
+      message: `The county's address file could not be reached (${error instanceof Error ? error.message : "unknown error"}).`,
+    };
+  }
+
+  if (!rows.length) {
+    return {
+      ok: false,
+      reason: "not-found",
+      message: "No county-record address sits near this position, so no districts can be resolved from it.",
+    };
+  }
+
+  // Nearest recorded address by straight-line distance; the anchor is disclosed.
+  const nearest = rows.reduce((best, row) => {
+    const d = (row.latitude! - rawLatitude) ** 2 + (row.longitude! - rawLongitude) ** 2;
+    const bestD = (best.latitude! - rawLatitude) ** 2 + (best.longitude! - rawLongitude) ** 2;
+    return d < bestD ? row : best;
+  });
+  const anchorLat = nearest.latitude!;
+  const anchorLon = nearest.longitude!;
+  const meters = Math.abs(anchorLat - rawLatitude) * 111_320 + Math.abs(anchorLon - rawLongitude) * 111_320 * Math.cos((rawLatitude * Math.PI) / 180);
+
+  const lookup = await lookupPlace(nearest.full_address || nearest.address || "");
+  if (!lookup.ok) return lookup;
+  return { ...lookup, anchoredWithinMeters: Math.round(meters) };
+}
+
 export async function lookupPlace(input: string): Promise<PlaceLookup> {
   const parsed = parseAddressInput(input);
   if (!parsed) {

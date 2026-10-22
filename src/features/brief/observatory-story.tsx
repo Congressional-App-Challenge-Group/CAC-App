@@ -7,7 +7,7 @@ import { orgNames } from "@/lib/civic";
 import type { ObservatoryStory } from "@/types";
 
 function dateLabel(value: string, options: Intl.DateTimeFormatOptions = { month: "long", day: "numeric", year: "numeric" }) {
-  const date = new Date(`${value.slice(0, 10)}T12:00:00Z`);
+  const date = new Date(`${(value || "").slice(0, 10)}T12:00:00Z`);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("en-US", { ...options, timeZone: "UTC" });
 }
 
@@ -112,7 +112,7 @@ export function ObservatoryStory({ story }: { story: ObservatoryStory | null }) 
 
   useEffect(() => {
     const sections = document.querySelectorAll<HTMLElement>(
-      ".observatory-story, .observatory-archive, .observatory-network, .observatory-geography, .observatory-deadlines, .observatory-closing",
+      ".observatory-story, .observatory-archive, .observatory-network, .observatory-geography, .observatory-deadlines, .observatory-pulse, .observatory-timeline, .observatory-topics, .observatory-closing",
     );
     if (typeof IntersectionObserver === "undefined") return;
     const observer = new IntersectionObserver((entries) => {
@@ -124,6 +124,49 @@ export function ObservatoryStory({ story }: { story: ObservatoryStory | null }) 
     }, { rootMargin: "0px 0px -12% 0px", threshold: 0.08 });
     sections.forEach((section) => observer.observe(section));
     return () => observer.disconnect();
+  }, []);
+
+  // Continuous scroll-linked progress for the two sections whose diagrams are
+  // meant to *build* as they pass through the viewport: the story instrument
+  // (orbit + steps) and the network diagram (paths drawing from body/source/
+  // date/place into the decision). Progress is 0 while the section's graphic
+  // half is below the fold and 1 when it has passed the middle band, computed
+  // per frame in a rAF-throttled scroll/resize listener so reverse scrolling
+  // rewinds the drawing exactly. Reduced motion gets the completed drawing.
+  useEffect(() => {
+    const targets = [
+      { section: document.querySelector<HTMLElement>(".observatory-story"), property: "--story-progress" },
+      { section: document.querySelector<HTMLElement>(".observatory-network"), property: "--network-progress" },
+    ].filter((entry): entry is { section: HTMLElement; property: string } => Boolean(entry.section));
+    if (!targets.length) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const viewportBand = { start: window.innerHeight * 0.82, end: window.innerHeight * 0.2 };
+      for (const { section, property } of targets) {
+        const bounds = section.getBoundingClientRect();
+        const graphic = bounds.height * 0.55;
+        const entered = viewportBand.start - bounds.top;
+        const span = graphic + (viewportBand.start - viewportBand.end);
+        const progress = Math.min(1, Math.max(0, entered / Math.max(1, span)));
+        section.style.setProperty(property, progress.toFixed(3));
+      }
+    };
+    const schedule = () => { if (!frame) frame = window.requestAnimationFrame(update); };
+    if (!reducedMotion.matches) {
+      window.addEventListener("scroll", schedule, { passive: true });
+      window.addEventListener("resize", schedule, { passive: true });
+      update();
+    } else {
+      targets.forEach(({ section, property }) => section.style.setProperty(property, "1"));
+    }
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      targets.forEach(({ section, property }) => section.style.removeProperty(property));
+    };
   }, []);
 
   useEffect(() => {

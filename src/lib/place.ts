@@ -240,7 +240,7 @@ export function resolvePlace(
   const byKind = new Map<PlaceKind, PlaceDistrict>();
   for (const district of found) {
     const existing = byKind.get(district.kind);
-    if (!existing || district.code.localeCompare(existing.code) < 0) {
+    if (!existing || (district.code || "").localeCompare(existing.code || "") < 0) {
       byKind.set(district.kind, district);
     }
   }

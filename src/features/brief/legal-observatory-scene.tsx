@@ -187,6 +187,14 @@ export function LegalObservatoryScene() {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const pointer = new THREE.Vector2();
     const target = new THREE.Vector2();
+    // Scroll-driven retreat: the choreography hook publishes 0..1 progress as the
+    // hero scrolls out, and the camera pulls back/up so the sculpture recedes
+    // into the scene instead of being clipped by the section edge.
+    let retreat = 0;
+    const readRetreat = () => {
+      const raw = Number.parseFloat(host.dataset.cameraRetreat ?? "0");
+      retreat = Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0;
+    };
     const onPointerMove = (event: PointerEvent) => {
       if (event.pointerType === "touch" || reducedMotion.matches) return;
       const bounds = host.getBoundingClientRect();
@@ -205,19 +213,41 @@ export function LegalObservatoryScene() {
     const render = (time: number) => {
       if (document.hidden) return;
       const seconds = time * 0.001;
+      readRetreat();
+      const eased = retreat * retreat * (3 - 2 * retreat);
       if (!reducedMotion.matches) {
-        pointer.lerp(target, 0.035);
-        camera.position.x = initialPosition.x + pointer.x * 0.5;
-        camera.position.y = initialPosition.y - pointer.y * 0.22;
-        camera.lookAt(pointer.x * 0.15, 0.05 + pointer.y * 0.08, 0);
-        sculpture.rotation.y = Math.sin(seconds * 0.16) * 0.075 + pointer.x * 0.035;
-        sculpture.rotation.x = pointer.y * 0.018;
-        rings.forEach((ring, index) => { ring.rotation.z = seconds * (0.035 + index * 0.012) * (index === 1 ? -1 : 1); });
+        pointer.lerp(target, 0.055);
+        // Pointer-driven object depth: the sculpture turns toward the cursor.
+        // The yaw gain is large enough to read at arm's length (like the
+        // reference's reactive centerpiece) but clamped so labels/CTAs stay
+        // clear and the object never feels loose.
+        sculpture.rotation.y = Math.sin(seconds * 0.16) * 0.05 + pointer.x * 0.42 + eased * 0.55;
+        sculpture.rotation.x = pointer.y * 0.16;
+        sculpture.position.x = pointer.x * 0.34 + eased * 0.9;
+        sculpture.position.y = -pointer.y * 0.2 + eased * 0.4;
+        // Layered depth: rings react faster than the body.
+        rings.forEach((ring, index) => {
+          ring.rotation.z = seconds * (0.035 + index * 0.012) * (index === 1 ? -1 : 1);
+          ring.rotation.x = 0.78 + index * 0.08 + pointer.y * (0.09 + index * 0.03);
+          ring.rotation.y = 0.3 + index * 0.48 - pointer.x * (0.16 + index * 0.06);
+        });
+        // Columns swivel against the body slightly — spatial separation.
+        columns.rotation.y = -pointer.x * 0.14;
         ribbons.forEach(({ curve, light, phase }, index) => {
           const point = curve.getPoint((seconds * (0.022 + index * 0.004) + phase) % 1);
           light.position.copy(point);
           light.intensity = 0.8 + Math.sin(seconds * 0.65 + phase) * 0.25;
         });
+      } else if (eased > 0) {
+        camera.position.y = initialPosition.y + eased * 1.35;
+        camera.position.z = initialPosition.z + eased * 3.4;
+        camera.lookAt(0, 0.05 + eased * 0.9, 0);
+      }
+      if (reducedMotion.matches) {
+        // Reduced motion: no pointer drive; a gentle scroll-only retreat keeps
+        // the exit transition without continuous animation.
+        sculpture.scale.setScalar(1 - eased * 0.14);
+        sculpture.rotation.y = eased * 0.5;
       }
       renderer.render(scene, camera);
       host.dataset.ready = "true";

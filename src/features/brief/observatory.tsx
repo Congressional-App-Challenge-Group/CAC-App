@@ -15,6 +15,7 @@ import { groupChangesByDecision } from "@/lib/changes";
 import { isDecidedStatus } from "@/types";
 import type { DecisionChange, ObservatoryStory } from "@/types";
 import { ObservatoryClosing, ObservatoryStory as Story } from "@/features/brief/observatory-story";
+import { useHeroChoreography } from "@/features/brief/use-hero-choreography";
 
 const LegalObservatoryScene = dynamic(
   () => import("@/features/brief/legal-observatory-scene").then((scene) => scene.LegalObservatoryScene),
@@ -35,13 +36,14 @@ type Entry = {
 };
 
 function shortDate(date: string) {
-  const parsed = new Date(`${date.slice(0, 10)}T12:00:00Z`);
+  const parsed = new Date(`${(date || "").slice(0, 10)}T12:00:00Z`);
   return Number.isNaN(parsed.getTime())
     ? date
     : parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
 export function Observatory({ changes, story }: { changes: DecisionChange[]; story: ObservatoryStory | null }) {
+  useHeroChoreography();
   const decisions = useDecisions();
   const [query, setQuery] = useState("");
   const [period, setPeriod] = useState<Period>("upcoming");
@@ -50,23 +52,23 @@ export function Observatory({ changes, story }: { changes: DecisionChange[]; sto
   const searchResults = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return [];
-    return decisions
+    return (decisions || [])
       .filter((item) => `${item.title} ${item.summary} ${item.topic} ${orgNames[item.organization]} ${item.sources.map((source) => source.title).join(" ")}`.toLowerCase().includes(needle))
       .slice(0, 4);
   }, [decisions, query]);
 
   const scheduled = useMemo(
-    () => upcomingActions(decisions, { limit: 100 }).filter((item) => agendaKind(item.deadline.officialStatus) !== "informational"),
+    () => upcomingActions(decisions || [], { limit: 100 }).filter((item) => agendaKind(item.deadline.officialStatus) !== "informational"),
     [decisions],
   );
   const recentDecisions = useMemo(
-    () => decisions.filter((item) => isDecidedStatus(item.status)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 3),
+    () => (decisions || []).filter((item) => isDecidedStatus(item.status)).sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || "")).slice(0, 3),
     [decisions],
   );
-  const recentChanges = useMemo(() => groupChangesByDecision(changes).slice(0, 3), [changes]);
+  const recentChanges = useMemo(() => groupChangesByDecision(changes || []).slice(0, 3), [changes]);
 
   const entries = useMemo<Entry[]>(() => {
-    const future: Entry[] = scheduled.slice(0, 8).map(({ decision, deadline, days }) => ({
+    const future: Entry[] = (scheduled || []).slice(0, 8).map(({ decision, deadline, days }) => ({
       key: `deadline-${decision.id}`,
       slug: decision.slug,
       title: decision.title,
@@ -78,8 +80,8 @@ export function Observatory({ changes, story }: { changes: DecisionChange[]; sto
       sourceUrl: deadline.sourceUrl,
     }));
     const seen = new Set<string>();
-    const past: Entry[] = [...changes]
-      .sort((a, b) => b.changedAt.localeCompare(a.changedAt))
+    const past: Entry[] = [...(changes || [])]
+      .sort((a, b) => (b.changedAt || "").localeCompare(a.changedAt || ""))
       .filter((change) => change.slug && !seen.has(change.decisionId) && Boolean(seen.add(change.decisionId)))
       .slice(0, 8)
       .map((change) => ({
@@ -87,7 +89,7 @@ export function Observatory({ changes, story }: { changes: DecisionChange[]; sto
         slug: change.slug,
         title: change.title,
         organization: orgNames[change.organization],
-        date: change.changedAt.slice(0, 10),
+        date: (change.changedAt || "").slice(0, 10),
         status: "Official record updated",
         detail: change.current ? `${change.field}: ${change.current}` : `The official ${change.field} changed.`,
         period: "past",
@@ -111,7 +113,7 @@ export function Observatory({ changes, story }: { changes: DecisionChange[]; sto
 
   const topics = useMemo(() => {
     const counts = new Map<string, number>();
-    decisions.forEach((item) => counts.set(item.topic, (counts.get(item.topic) ?? 0) + 1));
+    (decisions || []).forEach((item) => counts.set(item.topic, (counts.get(item.topic) ?? 0) + 1));
     return [...counts].sort((a, b) => b[1] - a[1]).slice(0, 6);
   }, [decisions]);
 
@@ -125,7 +127,10 @@ export function Observatory({ changes, story }: { changes: DecisionChange[]; sto
         </div>
         <div className="observatory-hero__content">
           <p className="observatory-kicker"><span />Law. Decisions. What comes next.</p>
-          <h1 id="observatory-title">See what <em>the law</em><br className="observatory-desktop-break" /> is changing.</h1>
+          <h1 id="observatory-title">
+            <span className="hero-line"><span>See what <em>the law</em></span></span>{" "}
+            <span className="hero-line"><span><br className="observatory-desktop-break" />is changing.</span></span>
+          </h1>
           <p className="observatory-hero__summary">Legislation, public decisions, and critical deadlines — explained in one clear place.</p>
           <div className="observatory-search-wrap">
             <form action="/explore" method="get" role="search" className="observatory-search" onSubmit={(event) => {
@@ -187,7 +192,7 @@ export function Observatory({ changes, story }: { changes: DecisionChange[]; sto
         <div className="pulse-grid">
           <article className="pulse-panel pulse-panel--deadlines">
             <header><span className="panel-icon"><CalendarClock size={18} /></span><div><p>ON THE PUBLIC CALENDAR</p><h3>Upcoming deadlines</h3></div><Link href="/deadlines" aria-label="All upcoming deadlines"><ArrowUpRight size={18} /></Link></header>
-            {scheduled.length ? <ul className="pulse-list">{scheduled.slice(0, 3).map(({ decision, deadline, countdown }) => (
+            {(scheduled || []).length ? <ul className="pulse-list">{scheduled.slice(0, 3).map(({ decision, deadline, countdown }) => (
               <li key={decision.id}><span className="pulse-date">{deadline.date ? shortDate(deadline.date) : countdown}</span><Link href={`/decisions/${decision.slug}`}><strong>{decision.title}</strong><small>{orgNames[decision.organization]} · {deadline.label ?? decision.status}</small></Link></li>
             ))}</ul> : <p className="pulse-empty">No upcoming action has a date in the records. CivicLens doesn&apos;t estimate one.</p>}
             <Link className="panel-more" href="/deadlines">See all published dates <ArrowRight size={15} /></Link>
@@ -253,7 +258,7 @@ export function Observatory({ changes, story }: { changes: DecisionChange[]; sto
           <Link className="observatory-text-link" href="/explore">Explore all records <ArrowRight size={16} /></Link>
         </header>
         <div className="topic-grid">{topics.map(([topic, count], index) => (
-          <Link key={topic} href={`/explore?topic=${encodeURIComponent(topic)}`} className="topic-link">
+          <Link key={topic} href={`/explore?topic=${encodeURIComponent(topic)}`} className="topic-link" style={{ "--topic-index": index } as React.CSSProperties}>
             <span className="topic-number">{String(index + 1).padStart(2, "0")}</span><span><strong>{topic}</strong><small>{count} tracked {count === 1 ? "record" : "records"}</small></span><ArrowUpRight size={17} />
           </Link>
         ))}</div>

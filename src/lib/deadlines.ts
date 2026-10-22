@@ -107,7 +107,7 @@ export function nextDeadline(
     .map((entry) => ({ date: dateOnly(entry.date), label: entry.label }))
     .filter((entry): entry is { date: string; label: string } => Boolean(entry.date))
     .filter((entry) => daysUntil(entry.date, now, timeZone) >= 0)
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
   if (dated.length) {
     return {
@@ -123,7 +123,7 @@ export function nextDeadline(
     .map((event) => ({ date: dateOnly(event.date), title: event.title }))
     .filter((event): event is { date: string; title: string } => Boolean(event.date))
     .filter((event) => daysUntil(event.date, now, timeZone) >= 0)
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
   if (upcoming.length) {
     return {

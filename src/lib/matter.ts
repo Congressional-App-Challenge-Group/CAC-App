@@ -239,8 +239,8 @@ function mergeDeadline(appearances: Decision[], now: Date): DecisionDeadline | u
   const today = now.toISOString().slice(0, 10);
   const upcoming = dated
     .filter((deadline) => deadline.date! >= today)
-    .sort((a, b) => a.date!.localeCompare(b.date!));
-  return upcoming[0] ?? dated.sort((a, b) => b.date!.localeCompare(a.date!))[0];
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  return upcoming[0] ?? dated.sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0];
 }
 
 function mergeTimeline(appearances: Decision[], matterId: string): TimelineEvent[] {
@@ -258,7 +258,7 @@ function mergeTimeline(appearances: Decision[], matterId: string): TimelineEvent
     }
   }
 
-  events.sort((a, b) => a.date.localeCompare(b.date));
+  events.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
   // Only the final event of the merged matter can be in flight.
   return events.map((event, index) => ({
@@ -289,7 +289,7 @@ function mergeDates(appearances: Decision[]) {
       byKey.set(`${date.date}|${date.label}`, date);
     }
   }
-  return [...byKey.values()].sort((a, b) => a.date.localeCompare(b.date));
+  return [...byKey.values()].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 }
 
 /**
@@ -309,10 +309,10 @@ export function mergeAppearances(
   const ranked = [...appearances].sort((a, b) => {
     const rank = stageRank(b.status) - stageRank(a.status);
     if (rank !== 0) return rank;
-    return b.updatedAt.localeCompare(a.updatedAt);
+    return (b.updatedAt || "").localeCompare(a.updatedAt || "");
   });
   const winner = ranked[0];
-  const chronological = [...appearances].sort((a, b) => a.publishedAt.localeCompare(b.publishedAt));
+  const chronological = [...appearances].sort((a, b) => (a.publishedAt || "").localeCompare(b.publishedAt || ""));
   const first = chronological[0];
   const last = chronological[chronological.length - 1];
 
@@ -427,7 +427,7 @@ export function collapseToMatters(decisions: Decision[], now = new Date()): Coll
     }
   }
 
-  matters.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  matters.sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
   return { matters, excluded, aliases };
 }
 

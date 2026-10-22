@@ -21,7 +21,7 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
   const [expanded, setExpanded] = useState(false);
 
   const ordered = useMemo(
-    () => [...events].sort((a, b) => b.date.localeCompare(a.date)),
+    () => [...events].sort((a, b) => (b.date || "").localeCompare(a.date || "")),
     [events],
   );
   const visible = expanded ? ordered : ordered.slice(0, INITIAL_VISIBLE);

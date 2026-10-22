@@ -5,7 +5,7 @@
   "scripts": {
     "setup": "pnpm install",
     "dev": "pnpm ensure:data && next dev",
-    "dev:fast": "next dev",
+    "dev:fast": "pnpm ensure:data && next dev",
     "build": "pnpm ensure:data && next build",
     "ensure:data": "node --import tsx scripts/prepare-data.ts",
     "serve": "pnpm build && pnpm start",
@@ -26,7 +26,8 @@
     "language": "pnpm enrich:language && pnpm approve:drafts",
     "collapse": "node --import tsx scripts/collapse-matters.ts",
     "deadlines": "node --import tsx scripts/report-deadlines.ts",
-    "pipeline": "pnpm ingest:local && pnpm collapse && pnpm enrich:matters && pnpm changes && pnpm enrich"
+    "pipeline": "pnpm ingest:local && pnpm collapse && pnpm enrich:matters && pnpm changes && pnpm enrich",
+    "refresh": "FORCE_DATA_REFRESH=true pnpm ensure:data"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

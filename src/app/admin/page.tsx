@@ -141,7 +141,7 @@ export default async function AdminPage() {
         <ul className="card divide-y divide-line">
           {active
             .slice()
-            .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+            .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
             .slice(0, 8)
             .map((decision) => (
               <li key={decision.id} className="flex flex-wrap items-center justify-between gap-3 p-4">

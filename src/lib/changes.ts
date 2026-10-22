@@ -161,7 +161,7 @@ export function diffSnapshots(
     }
   }
 
-  return changes.sort((a, b) => b.changedAt.localeCompare(a.changedAt));
+  return (changes || []).sort((a, b) => (b.changedAt || "").localeCompare(a.changedAt || ""));
 }
 
 /** What a pipeline job reports it rewrote, so its own edits are not misread as movement. */
@@ -215,6 +215,8 @@ export function changesSince(changes: DecisionChange[], days: number): DecisionC
 export function groupChangesByDecision(
   changes: DecisionChange[],
 ): Array<{ decisionId: string; slug: string; title: string; organization: Decision["organization"]; changes: DecisionChange[] }> {
+  if (!changes || changes.length === 0) return [];
+  
   const groups = new Map<string, DecisionChange[]>();
   for (const change of changes) {
     const bucket = groups.get(change.decisionId);
@@ -230,7 +232,7 @@ export function groupChangesByDecision(
       organization: group[0].organization,
       changes: group,
     }))
-    .sort((a, b) => b.changes[0].changedAt.localeCompare(a.changes[0].changedAt));
+    .sort((a, b) => (b.changes[0].changedAt || "").localeCompare(a.changes[0].changedAt || ""));
 }
 
 export function changeFieldLabel(field: ChangeField): string {

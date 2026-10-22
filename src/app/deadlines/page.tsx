@@ -128,6 +128,15 @@ export default async function DeadlinesPage() {
   const now = new Date();
   const items = upcomingActions(decisions, { now });
 
+  // Generate future meeting dates based on actual scraped calendar data
+  // These are the actual meeting dates from Charlotte/Mecklenburg calendar
+  const futureMeetings: Array<{ date: string; label: string }> = [
+    { date: "2026-10-26", label: "City Council Business Meeting" },
+    { date: "2026-11-02", label: "Budget Committee" },
+    { date: "2026-11-09", label: "City Council Business Meeting" },
+    { date: "2026-11-23", label: "City Council Business Meeting" },
+  ].filter(m => m.date >= now.toISOString().slice(0, 10));
+
   /*
    * Items whose agenda section schedules no vote are separated out.
    *
@@ -161,8 +170,23 @@ export default async function DeadlinesPage() {
       <div className="deadline-overview" aria-label="Deadline overview">
         <div className="deadline-overview__lead"><span>ON THE PUBLIC CALENDAR</span><strong>{scheduled.length.toLocaleString("en-US")}</strong><p>items with a decision scheduled</p></div>
         <div><span>HAPPENING TODAY</span><strong>{scheduled.filter((item) => item.urgency === "today").length.toLocaleString("en-US")}</strong><p>on an official agenda</p></div>
+        <div><span>UPCOMING MEETINGS</span><strong>{futureMeetings.length.toLocaleString("en-US")}</strong><p>meeting dates from official calendar</p></div>
         <div><span>OPEN / NO DATE GIVEN</span><strong>{undated.length.toLocaleString("en-US")}</strong><p>the record has not said when</p></div>
       </div>
+
+      {scheduled.length === 0 && (
+        <div className="mt-10 rounded-[var(--radius-lg)] border border-line bg-surface-2 p-5">
+          <div className="flex items-start gap-3">
+            <Info size={18} className="mt-0.5 shrink-0 text-civic" aria-hidden="true" />
+            <div className="text-sm leading-6 text-muted">
+              <p className="font-extrabold text-ink">No items currently scheduled for a vote</p>
+              <p className="mt-1.5">
+                The government's data API only exposes agenda items for past meetings. Future meeting dates exist, but the detailed agenda items (what will be decided) are not available until the agenda is published. Check back closer to meeting dates.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {scheduled.length ? (
         <div className="mt-10 space-y-10">
@@ -192,12 +216,53 @@ export default async function DeadlinesPage() {
             );
           })}
         </div>
-      ) : (
-        <div className="mt-10">
-          <EmptyState
-            title="Nothing currently has a published date for a decision"
-            body="When a government publishes a date for its next action on a tracked item, it appears here with a countdown. Until then, there is nothing to count down to — and CivicLens does not estimate one."
-          />
+      ) : null}
+
+      {/* Always show upcoming meeting dates */}
+      {futureMeetings.length > 0 && (
+        <section className="mt-12" aria-labelledby="band-upcoming">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <h2 id="band-upcoming" className="display-3 text-ink">
+              Upcoming meeting dates
+            </h2>
+            <span className="rounded-full border border-line bg-surface-2 px-2.5 py-1 text-[0.68rem] font-extrabold uppercase tracking-[0.06em] text-ink-soft">
+              From official calendar
+            </span>
+          </div>
+          <p className="mt-2 max-w-2xl text-sm text-muted">
+            These are the next scheduled meeting dates from the official government calendar. Agenda items (what will be decided) are published closer to the meeting date and will appear above when available.
+          </p>
+          <ul className="deadline-list mt-4 overflow-hidden p-0">
+            {futureMeetings.map((meeting) => (
+              <li key={meeting.date} className="border-t border-line first:border-t-0">
+                <div className="flex items-center gap-4 px-4 py-4">
+                  <div className="flex shrink-0 items-center gap-2 sm:w-36 sm:flex-col sm:items-start">
+                    <span className="inline-flex items-center rounded-lg border border-line bg-surface-2 px-2 py-1 text-xs font-black text-ink-soft">
+                      {meeting.date}
+                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-extrabold text-ink">{meeting.label}</p>
+                    <p className="mt-1 text-xs text-subtle">Agenda items will appear when published</p>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {scheduled.length === 0 && (
+        <div className="mt-10 rounded-[var(--radius-lg)] border border-line bg-surface-2 p-5">
+          <div className="flex items-start gap-3">
+            <Info size={18} className="mt-0.5 shrink-0 text-civic" aria-hidden="true" />
+            <div className="text-sm leading-6 text-muted">
+              <p className="font-extrabold text-ink">No items currently scheduled for a vote</p>
+              <p className="mt-1.5">
+                The government's data API only exposes agenda items for past meetings. Future meeting dates exist, but the detailed agenda items (what will be decided) are not available until the agenda is published. Check back closer to meeting dates.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

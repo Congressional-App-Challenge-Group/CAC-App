@@ -23,7 +23,7 @@ import { report } from "./shared";
  */
 
 const CACHE = resolve(process.cwd(), ".civiclens", "local-decisions.json");
-const MAX_AGE_HOURS = Number(process.env.DATA_MAX_AGE_HOURS || 20);
+const MAX_AGE_HOURS = Number(process.env.DATA_MAX_AGE_HOURS || 4); // Reduced from 20 to 4 hours for more frequent updates
 const MAX_AGE_MS = MAX_AGE_HOURS * 3_600_000;
 
 type Step = { label: string; script: string; required: boolean; env?: Record<string, string> };

@@ -112,6 +112,8 @@ export function PlaceFinder({ compact = false }: { compact?: boolean }) {
   const { setPreferences, preferences, ready } = usePreferences();
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locationNote, setLocationNote] = useState<string | null>(null);
   const [error, setError] = useState<LookupResponse & { ok: false } | null>(null);
 
   const submit = async (event: React.FormEvent) => {
@@ -172,11 +174,10 @@ export function PlaceFinder({ compact = false }: { compact?: boolean }) {
         <p className="mt-2 text-sm leading-6 text-muted">
           Look up which districts you live in, using the county&apos;s own address file. Your address
           is not stored on our servers.
-        </p>
-
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        </p>        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <input
             id="place-address"
+
             className="field"
             // A real address from the county's own file. A placeholder that fails
             // its own lookup teaches a first-time reader that the feature is
@@ -191,6 +192,88 @@ export function PlaceFinder({ compact = false }: { compact?: boolean }) {
             {busy ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
             {busy ? "Looking up" : "Look up"}
           </button>
+        </div>
+
+        {/* Optional device-position lookup. Never required: the typed address
+            stays fully functional, the request happens only on this explicit
+            press, and every failure mode is stated in words rather than
+            collapsing into silence. Coordinates go to CivicLens's own resolver
+            only, in a POST body, and are never stored. */}
+        <div className="mt-2">
+          <button
+            type="button"
+            className="text-xs font-extrabold text-civic transition-colors hover:text-civic-strong disabled:opacity-60"
+            disabled={locating}
+            onClick={() => {
+              if (locating) return;
+              if (typeof navigator === "undefined" || !navigator.geolocation) {
+                setLocationNote("This browser does not offer device location. Typing the address always works.");
+                return;
+              }
+              setLocating(true);
+              setLocationNote(null);
+              navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                  try {
+                    const response = await fetch("/api/place", {
+                      method: "PUT",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                      }),
+                    });
+                    const result = (await response.json()) as LookupResponse & { anchoredWithinMeters?: number };
+                    if (!result.ok) {
+                      setError(result);
+                      return;
+                    }
+                    setPlace({
+                      address: result.matchedAddress,
+                      matchedAddress: result.matchedAddress,
+                      latitude: result.latitude,
+                      longitude: result.longitude,
+                      zipCode: result.zipCode,
+                      districts: result.districts,
+                      resolvedAt: new Date().toISOString(),
+                    });
+                    if (result.zipCode && ready) {
+                      setPreferences({ ...preferences, zipCode: result.zipCode });
+                    }
+                    setLocationNote(
+                      result.anchoredWithinMeters !== undefined
+                        ? `Matched to the county-record address within about ${result.anchoredWithinMeters} m of that position.`
+                        : null,
+                    );
+                  } catch {
+                    setLocationNote("The lookup could not be reached. Try typing the address instead.");
+                  } finally {
+                    setLocating(false);
+                  }
+                },
+                (positionError) => {
+                  setLocating(false);
+                  setLocationNote(
+                    positionError.code === positionError.PERMISSION_DENIED
+                      ? "Location permission was declined — that is fine. Type your address above."
+                      : positionError.code === positionError.POSITION_UNAVAILABLE
+                        ? "The device position is unavailable right now. Type your address above."
+                        : "The device took too long to respond. Type your address above.",
+                  );
+                },
+                { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 },
+              );
+            }}
+          >
+            {locating ? "Locating…" : "Use my device location instead"}
+          </button>
+          <p className="mt-1 text-[11px] leading-4 text-subtle">
+            Optional. Asks your browser for permission first; nothing is stored, and where you
+            happen to be standing is not where you vote — typing your address gives the precise result.
+          </p>
+          {locationNote ? (
+            <p className="mt-1 text-[11px] leading-4 text-muted" role="status">{locationNote}</p>
+          ) : null}
         </div>
       </form>
 

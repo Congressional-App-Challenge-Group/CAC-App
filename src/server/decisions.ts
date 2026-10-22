@@ -173,7 +173,7 @@ function mapDecision(row: Row): Decision {
     afterText: text(row.after_text) || undefined,
     isPublished: Boolean(row.is_published),
     sources: (row.sources || []).map(mapSource),
-    timeline: (row.timeline_events || []).map(mapEvent).sort((a, b) => a.date.localeCompare(b.date)),
+    timeline: (row.timeline_events || []).map(mapEvent).sort((a, b) => (a.date || "").localeCompare(b.date || "")),
     geography: mapGeography(row),
     money: mapMoney(row),
     deadline: mapDeadline(row),
@@ -332,7 +332,7 @@ export async function getDecisions(options: GetOptions = {}): Promise<Decision[]
   const supabase = client();
   if (!supabase) {
     const local = await localDecisions();
-    const withDrafts = await applyLocalDrafts(local);
+    const withDrafts = await applyLocalDrafts(local || []);
     return options.withRelations ? withDrafts : withDrafts.map(pruneForList);
   }
 
@@ -378,14 +378,14 @@ export async function getDecisions(options: GetOptions = {}): Promise<Decision[]
 
 async function applyLocalDrafts(decisions: Decision[]): Promise<Decision[]> {
   const drafts = await localDrafts();
-  if (!drafts.length) return decisions;
+  if (!drafts || !drafts.length) return decisions || [];
   const byDecision = new Map<string, DecisionDraft[]>();
   for (const draft of drafts) {
     const bucket = byDecision.get(draft.decisionId);
     if (bucket) bucket.push(draft);
     else byDecision.set(draft.decisionId, [draft]);
   }
-  return decisions.map((decision) => {
+  return (decisions || []).map((decision) => {
     const own = byDecision.get(decision.id);
     return own ? applyApprovedDrafts(decision, own) : decision;
   });
@@ -396,15 +396,16 @@ export async function getDecision(slugOrId: string): Promise<Decision | null> {
   if (!supabase) {
     const local = await localDecisions();
     const lookup = (value: string) =>
-      local.find((decision) => decision.slug === value || decision.id === value) ?? null;
+      (local || []).find((decision) => decision.slug === value || decision.id === value) ?? null;
     let found = lookup(slugOrId);
     if (!found) {
-      const alias = (await localAliases())[slugOrId];
+      const aliases = await localAliases();
+      const alias = aliases ? aliases[slugOrId] : null;
       if (alias) found = lookup(alias);
     }
     if (!found) return null;
-    const [withDrafts] = await applyLocalDrafts([found]);
-    return withDrafts;
+    const withDrafts = await applyLocalDrafts([found]);
+    return withDrafts[0] || found;
   }
 
   const field = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(slugOrId) ? "id" : "slug";
@@ -435,6 +436,8 @@ export async function getDecision(slugOrId: string): Promise<Decision | null> {
 /** Recently detected changes, newest first. */
 export async function getObservatoryStory(): Promise<ObservatoryStory | null> {
   const all = await getDecisions({ withRelations: true, limit: 1000 });
+  if (!all || all.length === 0) return null;
+  
   const featured = all
     .filter((decision) =>
       decision.sources.some((source) => source.verificationStatus === "verified" && Boolean(source.url)) &&
@@ -450,14 +453,14 @@ export async function getObservatoryStory(): Promise<ObservatoryStory | null> {
         const dates = new Set(verified.map((event) => event.date)).size;
         return stages * 100 + dates * 10 + verified.length;
       };
-      return storyScore(b) - storyScore(a) || b.updatedAt.localeCompare(a.updatedAt);
+      return storyScore(b) - storyScore(a) || (b.updatedAt || "").localeCompare(a.updatedAt || "");
     })[0];
 
   const source = featured?.sources.find((entry) => entry.verificationStatus === "verified" && Boolean(entry.url));
   if (!featured || !source) return null;
   const verifiedTimeline = featured.timeline
     .filter((event) => event.verificationStatus === "verified")
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const storyTimeline = verifiedTimeline;
   const latestRecordedEvent = [...verifiedTimeline].reverse().find((event) => event.title !== "First tracked appearance");
   const currentStoryDate = featured.deadline?.date && featured.deadline.date >= new Intl.DateTimeFormat("en-CA", {
@@ -551,7 +554,7 @@ export async function getRecentChanges(options: { days?: number; limit?: number 
 
   if (!supabase) {
     const local = (await readArtifact<DecisionChange[]>("changes.json")) ?? [];
-    return local.slice(0, limit);
+    return (local || []).slice(0, limit);
   }
 
   let query = supabase

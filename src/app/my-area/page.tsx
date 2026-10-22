@@ -81,7 +81,7 @@ export default function MyAreaPage() {
     }
 
     return matched.sort(
-      (a, b) => b.weight - a.weight || b.decision.updatedAt.localeCompare(a.decision.updatedAt),
+      (a, b) => b.weight - a.weight || (b.decision.updatedAt || "").localeCompare(a.decision.updatedAt || ""),
     );
   }, [decisions, districts, preferences]);
 

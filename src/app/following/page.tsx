@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, BellRing, Heart, MapPin } from "lucide-react";
 import { useDecisions } from "@/components/decisions-provider";
+import { ChangesSinceVisit } from "@/features/following/changes-since-visit";
 import { DecisionCard } from "@/features/decisions/decision-card";
 import { usePreferences } from "@/features/preferences/preferences";
 import { FollowPlaceButton } from "@/features/place/follow";
@@ -56,7 +57,7 @@ function Metric({ n, label }: { n: number; label: string }) {
  */
 export default function Following() {
   const decisions = useDecisions();
-  const { following, followingPlaces } = usePreferences();
+  const { following, followingPlaces, ready } = usePreferences();
 
   const saved = decisions.filter((decision) => following.includes(decision.id));
 
@@ -132,6 +133,12 @@ export default function Following() {
         title="Following"
         description="Status changes, recent updates, and upcoming dates for the items and places you follow."
       />
+
+      {ready && (following.length > 0 || followingPlaces.length > 0) ? (
+        <div className="my-6">
+          <ChangesSinceVisit />
+        </div>
+      ) : null}
 
       <div className="my-8 grid gap-3 md:grid-cols-3">
         <Metric n={saved.length} label="Followed decisions" />

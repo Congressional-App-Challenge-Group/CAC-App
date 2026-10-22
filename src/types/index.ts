@@ -351,12 +351,24 @@ export type UserPreferences = { zipCode: string; roles: UserRole[]; interests: s
 export type CivicAssistantAnswer = {
   text: string;
   citations: { title: string; url: string }[];
+  /** Cross-record answers only: total records matched before the display cap. */
+  matched?: number;
+  /** Cross-record answers only: how many were composed into `text`. */
+  shown?: number;
+  /** True when a deadline window was asked for but some matching open records
+   *  state no date, so the answer must disclose that absence. */
+  incomplete?: boolean;
 };
 
 export interface CivicAssistantService {
   answerQuestion(input: {
     question: string;
     decisionId?: string;
+    /** The visitor's saved ZIP, only when they ask about "my" area. */
+    userZip?: string;
     userContext?: UserPreferences;
   }): Promise<CivicAssistantAnswer>;
+
+  /** Cross-record question answering over the whole verified dataset. */
+  answerAcrossRecords(input: { question: string; userZip?: string }): Promise<CivicAssistantAnswer>;
 }

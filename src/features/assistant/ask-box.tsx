@@ -3,9 +3,10 @@ import { useState } from "react";
 import { Bot, ExternalLink, Send, Sparkles } from "lucide-react";
 import type { CivicAssistantAnswer, Decision } from "@/types";
 
-const suggestions = ["Has this been approved?", "What changed most recently?", "Who could be affected?", "What happens next?", "Is a cost listed?"];
+const suggestions = ["Has this been approved?", "What changed most recently?", "Who could be affected?", "What happens next?"];
+const crossSuggestions = ["What's scheduled for a vote this month?", "What rezonings are scheduled?", "What changed recently?", "What's happening with housing?"];
 
-export function AskBox({ decision }: { decision?: Decision }) {
+export function AskBox({ decision, compact }: { decision?: Decision; compact?: boolean }) {
   const [q, setQ] = useState("");
   const [answer, setAnswer] = useState<CivicAssistantAnswer | null>(null);
   const [error, setError] = useState("");
@@ -38,27 +39,38 @@ export function AskBox({ decision }: { decision?: Decision }) {
   }
 
   return (
-    <div className="card overflow-hidden">
-      <div className="flex items-center gap-3 border-b border-line bg-surface-2 px-5 py-4">
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-ink text-civic"><Bot size={20} /></span>
-        <div className="flex-1">
-          <h2 className="font-black tracking-[-.02em]">Ask CivicLens</h2>
-          <p className="text-xs text-subtle">Answers are grounded in indexed official records</p>
+    <div className={compact ? "" : "card overflow-hidden"}>
+      {!compact && (
+        <div className="flex items-center gap-3 border-b border-line bg-surface-2 px-5 py-4">
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-ink text-civic"><Bot size={20} /></span>
+          <div className="flex-1">
+            <h2 className="font-black tracking-[-.02em]">Ask CivicLens</h2>
+            <p className="text-xs text-subtle">Answers are grounded in indexed official records</p>
+          </div>
+          <Sparkles size={18} className="text-civic" />
         </div>
-        <Sparkles size={18} className="text-civic" />
-      </div>
-      <div className="p-5">
-        <div className="flex flex-wrap gap-2">
-          {suggestions.slice(0, decision ? 5 : 3).map((s) => (
-            <button className="chip text-left" onClick={() => ask(s)} key={s}>{s}</button>
-          ))}
-        </div>
-        <div className="mt-4 flex gap-2">
+      )}
+      <div className={compact ? "p-4" : "p-5"}>
+        {!compact && (
+          <div className="flex flex-wrap gap-2">
+            {(decision ? suggestions : crossSuggestions).map((s) => (
+              <button className="chip text-left" onClick={() => ask(s)} key={s}>{s}</button>
+            ))}
+          </div>
+        )}
+        <div className={compact ? "flex gap-2" : "mt-4 flex gap-2"}>
           <label className="flex-1">
             <span className="sr-only">Your question</span>
-            <input className="field h-12" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ask()} placeholder="Ask a question about this decision…" />
+            <input 
+              className="field" 
+              style={{ height: compact ? "48px" : "48px" }}
+              value={q} 
+              onChange={(e) => setQ(e.target.value)} 
+              onKeyDown={(e) => e.key === "Enter" && ask()} 
+              placeholder={compact ? "Quick question..." : "Ask a question about this decision…"} 
+            />
           </label>
-          <button className="btn btn-primary h-12 w-12 p-0" onClick={() => ask()} disabled={busy} aria-label="Send question"><Send size={18} /></button>
+          <button className="btn btn-primary p-0" style={{ width: compact ? "48px" : "48px", height: compact ? "48px" : "48px" }} onClick={() => ask()} disabled={busy} aria-label="Send question"><Send size={18} /></button>
         </div>
         {busy && <p className="mt-4 animate-pulse text-sm font-bold text-civic">Checking indexed records…</p>}
         {error && <p className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800" role="alert">{error}</p>}
@@ -81,4 +93,4 @@ export function AskBox({ decision }: { decision?: Decision }) {
       </div>
     </div>
   );
-}
+}
