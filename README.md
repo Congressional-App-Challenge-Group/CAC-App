@@ -1,6 +1,6 @@
 # CivicLens
 
-AI-powered civic transparency platform for Charlotte-Mecklenburg residents.
+AI-powered civic transparency platform for Charlotte-Mecklenburg residents. Built for the 2026 Congressional App Challenge.
 
 ## 🚀 Quick Start
 
@@ -34,12 +34,12 @@ AI-powered civic transparency platform for Charlotte-Mecklenburg residents.
 
 ## ✨ Features
 
-- **AI Document Summarization**: Summarize government decisions with Together AI (free tier)
-- **Smart Q&A**: Ask questions about decisions, get concise answers (explain more for detail)
+- **AI Document Summarization**: Summarize government decisions with Groq AI (free tier)
+- **Smart Q&A**: Ask questions about decisions, get concise answers (ask "explain more" for detail)
 - **Decision Comparison**: Compare similar decisions side-by-side
 - **Historical Impact Analysis**: See patterns from similar past decisions
 - **Deadline Tracking**: Upcoming government meeting dates from official calendar
-- **UX Improvements**: AI buttons at top (no scrolling), quick question box
+- **District Pages**: View decisions by council, county, and school districts
 
 ## 🎯 Demo Flow
 
@@ -54,18 +54,42 @@ AI-powered civic transparency platform for Charlotte-Mecklenburg residents.
 - Next.js 15, React 19, TypeScript
 - Groq AI (free tier, 1000 tokens/second)
 - Tailwind CSS
-- Supabase (configured, using local JSON for demo)
+- Local JSON data for demo (Supabase configured but not required)
 
 ## 💡 Key Differentiators
 
 - **Free AI for users** - No cost to users or site owners
 - **Grounded in official records** - Every claim cites sources
 - **No hallucinations** - Response validation prevents unsupported claims
-- **Editorial approval** - AI content requires approval before public display
 - **Historical analysis only** - No predictions, only past patterns
+- **Transparent uncertainty** - Explicitly states when data is missing
 
 ## 📊 Data
 
-- 817+ decisions from Charlotte, Mecklenburg, and Durham
+- 1,490+ decisions from Charlotte, Mecklenburg, and Durham
+- ~30% with confirmed geography (rezoning petitions get exact locations)
 - Automatic data refresh every 4 hours
 - Real-time deadline tracking from official calendars
+
+## ⚠️ Known Issues
+
+- **CMS Board of Education data not yet ingested** - BoardDocs API integration pending
+- **Geography coverage limited** - Only rezoning petitions get exact address/district data (~30%)
+- **Some district pages may show fewer items** - Due to data limitations in official records
+- **AI key required for full features** - Falls back to template mode without Groq key
+
+## 🏗 Architecture
+
+- Data ingestion from Legistar APIs (Charlotte, Mecklenburg, Durham)
+- Geography enrichment using Charlotte's rezoning parcel dataset
+- District reverse-lookup using Mecklenburg County GIS layers
+- ZIP-based district assignment for decisions without exact addresses
+- AI abstraction layer supporting multiple providers (Groq, Together, etc.)
+
+## 📝 Congressional App Challenge Notes
+
+This project was built to help Charlotte-Mecklenburg residents understand local government decisions. The focus is on:
+- Making complex government records accessible
+- Using AI responsibly (grounded in facts, no predictions)
+- Transparent about data limitations
+- Free for all users

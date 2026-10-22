@@ -287,6 +287,9 @@ function geographyFromRecord(
  *   3. ZIP stated verbatim in the record text           (likely, no coordinates)
  *   4. partial ZIP or address fragment                 (likely, no coordinates)
  *   5. nothing                                          (unconfirmed)
+ *
+ * TODO: Improve address matching - current regex might miss some edge cases
+ * NOTE: ZIP code matching is approximate - could be improved with better data
  */
 export function matchDecisionGeography(
   decision: Pick<Decision, "title" | "summary" | "latestUpdate">,

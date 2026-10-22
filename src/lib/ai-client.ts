@@ -2,14 +2,11 @@
  * AI Client - Abstraction layer for AI providers
  *
  * Supports multiple AI backends with a unified interface. Currently configured
- * for Freebuff (free tier) via OpenAI-compatible gateway, with fallback to
+ * for Groq (free tier) via OpenAI-compatible gateway, with fallback to
  * deterministic templates when no API key is configured.
  *
- * All AI calls are:
- * - Logged for audit purposes
- * - Rate-limited to respect free tier quotas
- * - Grounded in provided context (no hallucinations)
- * - Result-validated before acceptance
+ * TODO: Add rate limiting for production use
+ * FIXME: Improve error handling for provider-specific failures
  */
 
 import { z } from "zod";

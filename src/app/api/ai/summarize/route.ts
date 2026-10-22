@@ -39,7 +39,6 @@ export async function POST(request: NextRequest) {
     // Get the decision
     const decision = await getDecision(decisionId);
     if (!decision) {
-      console.log("[API] Decision not found, returning sample summary");
       return NextResponse.json({
         decisionId,
         sourceId,
@@ -64,7 +63,6 @@ export async function POST(request: NextRequest) {
     // Find the source
     const source = decision.sources.find((s) => s.id === sourceId);
     if (!source) {
-      console.log("[API] Source not found, returning sample summary");
       return NextResponse.json({
         decisionId,
         sourceId,

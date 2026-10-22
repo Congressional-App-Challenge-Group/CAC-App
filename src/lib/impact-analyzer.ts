@@ -2,14 +2,11 @@
  * Impact Analyzer - Analyze historical patterns from similar decisions
  *
  * This module analyzes how similar decisions have played out in the past to
- * provide context for current decisions. All analysis is:
- * - Based on historical patterns from verified records
- * - Clearly labeled as analysis, not prediction
- * - Grounded in explicit outcomes (not speculation)
- * - Limited to what the records actually state
+ * provide context for current decisions.
  *
- * This is NOT a prediction tool - it shows what has happened before,
+ * NOTE: This is NOT a prediction tool - it shows what has happened before,
  * not what will happen next.
+ * TODO: Improve similarity matching for better historical context
  */
 
 import { callAI, validateAIResponse, type AIMessage } from "./ai-client";

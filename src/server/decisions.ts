@@ -19,6 +19,9 @@ import type {
 } from "@/types";
 import { applyApprovedDrafts } from "@/lib/enrichment";
 
+// TODO: Add caching for decision queries to improve performance
+// FIXME: Optimize the withRelations parameter for better query efficiency
+
 type Row = Record<string, unknown> & {
   sources?: Record<string, unknown>[];
   timeline_events?: Record<string, unknown>[];

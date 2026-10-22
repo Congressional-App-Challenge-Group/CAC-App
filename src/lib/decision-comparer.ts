@@ -2,14 +2,10 @@
  * Decision Comparison - Compare similar decisions side-by-side
  *
  * This module provides factual, side-by-side comparisons of decisions based on
- * their verified fields. All comparisons are:
- * - Based on explicit field values (no AI inference for basic comparisons)
- * - Grounded in official records
- * - Free of editorial judgment
- * - Clearly labeled as factual comparisons
+ * their verified fields.
  *
- * For advanced pattern analysis, AI can be used but must be clearly labeled
- * as analysis, not fact.
+ * TODO: Add more comparison fields (cost, timeline, stakeholders)
+ * FIXME: Improve similarity scoring algorithm for better matching
  */
 
 import type { Decision } from "@/types";

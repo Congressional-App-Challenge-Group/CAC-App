@@ -36,7 +36,6 @@ export async function POST(request: NextRequest) {
 
     // If decisions not found, return sample data for demo
     if (!decisionA || !decisionB) {
-      console.log("[API] Decisions not found, returning sample comparison");
       return NextResponse.json({
         comparison: {
           decisionA: {

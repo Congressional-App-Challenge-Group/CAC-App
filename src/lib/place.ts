@@ -24,6 +24,9 @@ import {
  *     district, and the interface says so instead of placing it in the nearest
  *     one. That is why 71% of the record set honestly reads "location not
  *     confirmed" rather than being silently assigned to a council member.
+ *
+ * TODO: Consider adding ZIP-based fallback for decisions without exact coordinates
+ * FIXME: The 71% unconfirmed rate could be improved with better data sources
  */
 
 /* -------------------------------------------------------------------------- */

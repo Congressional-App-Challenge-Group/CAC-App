@@ -31,7 +31,6 @@ export async function POST(request: NextRequest) {
     // Get the decision
     const decision = await getDecision(decisionId);
     if (!decision) {
-      console.log("[API] Decision not found, returning sample impact analysis");
       return NextResponse.json({
         decisionId,
         similarDecisions: [

@@ -2,13 +2,10 @@
  * Document Summarizer - Summarize long documents for civic records
  *
  * Takes long government documents (PDFs, staff reports, meeting transcripts)
- * and extracts key points, figures, and timelines. All summaries are:
- * - Generated from the document text only
- * - Require approval before public display
- * - Cited back to the original document
- * - Grounded in explicit content (no hallucinations)
+ * and extracts key points, figures, and timelines.
  *
- * This extends the existing draft system with a new draft field type.
+ * TODO: Improve extraction accuracy for complex financial documents
+ * NOTE: Summaries require approval before public display
  */
 
 import { callAI, validateAIResponse, type AIMessage } from "./ai-client";
