@@ -103,11 +103,8 @@ export async function callAI(
 ): Promise<AIResponse> {
   const finalConfig = { ...getAIConfig(), ...config };
 
-  console.log(`[AI] Provider: ${finalConfig.provider}, API Key: ${finalConfig.apiKey ? 'present' : 'missing'}, Model: ${finalConfig.model}`);
-
   // Template mode: return a deterministic response
   if (finalConfig.provider === "template" || !finalConfig.apiKey) {
-    console.log(`[AI] Using template mode (provider: ${finalConfig.provider}, hasKey: ${!!finalConfig.apiKey})`);
     return {
       text: generateTemplateResponse(messages),
       model: "template",
@@ -118,7 +115,6 @@ export async function callAI(
 
   // Freebuff or OpenAI: call the API
   try {
-    console.log(`[AI] Calling API at ${finalConfig.baseUrl} with model ${finalConfig.model}`);
     const response = await fetch(`${finalConfig.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
@@ -136,7 +132,6 @@ export async function callAI(
     if (!response.ok) {
       const error = await response.text();
       console.error(`[AI] API error (${finalConfig.provider}):`, error);
-      console.error(`[AI] Response status: ${response.status} ${response.statusText}`);
       // Fallback to template on error
       return {
         text: generateTemplateResponse(messages),
@@ -148,7 +143,6 @@ export async function callAI(
 
     const data = await response.json();
     const text = data.choices?.[0]?.message?.content || "";
-    console.log(`[AI] API success, response length: ${text.length}`);
 
     return {
       text,

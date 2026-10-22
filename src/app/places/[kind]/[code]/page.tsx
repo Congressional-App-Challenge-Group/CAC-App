@@ -163,13 +163,13 @@ export default async function PlacePage({
             )}
           </section>
 
-          {decided.length ? (
-            <section>
-              <SectionHeading
-                eyebrow="Decided"
-                title={`${decided.length} decided ${decided.length === 1 ? "item" : "items"}`}
-                description="What the official record now shows as decided, funded, or complete."
-              />
+          <section>
+            <SectionHeading
+              eyebrow="Decided"
+              title={`${decided.length} decided ${decided.length === 1 ? "item" : "items"}`}
+              description="What the official record now shows as decided, funded, or complete."
+            />
+            {decided.length ? (
               <div className="grid gap-5 md:grid-cols-2">
                 {decided.slice(0, 6).map((decision) => (
                   <DecisionCard
@@ -179,8 +179,13 @@ export default async function PlacePage({
                   />
                 ))}
               </div>
-            </section>
-          ) : null}
+            ) : (
+              <EmptyState
+                title="No decided items yet"
+                body="No indexed record in this district has been decided yet. Check back soon for updates."
+              />
+            )}
+          </section>
         </div>
 
         <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">

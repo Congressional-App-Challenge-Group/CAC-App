@@ -50,11 +50,14 @@ export const governmentSources: SourceConfig[] = [
     url: "https://durhamcounty.legistar.com/Calendar.aspx",
     statesOutcomes: false,
   },
-  {
-    key: "cms-boarddocs",
-    organization: "cms",
-    name: "CMS Board of Education",
-    kind: "links",
-    url: "https://go.boarddocs.com/nc/cmsnc/Board.nsf/Public",
-  },
+  // NOTE: CMS (Charlotte-Mecklenburg Schools) BoardDocs integration disabled
+  // The current "links" adapter only extracts HTML links and produces no structured decisions
+  // A proper BoardDocs API adapter or HTML scraper is needed for CMS data ingestion
+  // {
+  //   key: "cms-boarddocs",
+  //   organization: "cms",
+  //   name: "CMS Board of Education",
+  //   kind: "links",
+  //   url: "https://go.boarddocs.com/nc/cmsnc/Board.nsf/Public",
+  // },
 ];

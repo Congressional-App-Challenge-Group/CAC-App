@@ -66,7 +66,7 @@ export const placeKindMeta: Record<
   },
   school: {
     name: "School board district",
-    body: "CMS Board of Education",
+    body: "CMS Board of Education (not currently ingested - data source pending)",
     governs: "School boundaries, student assignment and the school budget",
     weight: 80,
   },
