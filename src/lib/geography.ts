@@ -285,7 +285,8 @@ function geographyFromRecord(
  *   1. petition number matched in the official dataset  (exact)
  *   2. street address matched in the official dataset   (exact)
  *   3. ZIP stated verbatim in the record text           (likely, no coordinates)
- *   4. nothing                                          (unconfirmed)
+ *   4. partial ZIP or address fragment                 (likely, no coordinates)
+ *   5. nothing                                          (unconfirmed)
  */
 export function matchDecisionGeography(
   decision: Pick<Decision, "title" | "summary" | "latestUpdate">,
@@ -316,11 +317,24 @@ export function matchDecisionGeography(
     }
   }
 
+  // Extract ZIP codes from multiple locations
   for (const haystack of haystacks) {
     const zip = extractZipFromText(haystack);
     if (zip) {
       return {
         zipCode: zip,
+        method: "record-text",
+        confidence: "likely",
+      };
+    }
+  }
+
+  // Fallback: try to find any 5-digit pattern that looks like a Charlotte-area ZIP
+  for (const haystack of haystacks) {
+    const relaxedZipMatch = haystack.match(/\b(28\d{3})\b/);
+    if (relaxedZipMatch) {
+      return {
+        zipCode: relaxedZipMatch[1],
         method: "record-text",
         confidence: "likely",
       };
