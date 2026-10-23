@@ -93,6 +93,13 @@ describe("AI Client", () => {
       assert.strictEqual(result.valid, true);
     });
 
+    it("accepts responses with years (dates) not in context", () => {
+      const response = "This was approved in 2025";
+      const context = "The document is about a recent decision";
+      const result = validateAIResponse(response, context);
+      assert.strictEqual(result.valid, true);
+    });
+
     it("accepts valid responses", () => {
       const response = "The document states the cost is $2.3M";
       const context = "The budget is $2.3M";

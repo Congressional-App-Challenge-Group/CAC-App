@@ -218,9 +218,12 @@ export function validateAIResponse(
 
   // Check for factual claims not in context (basic heuristic)
   // Only check large numbers (not dates, years, etc.)
+  // Skip year-like numbers (19xx or 20xx) since they're commonly in summaries
   const numbers = response.match(/\b\d{4,}(?:,\d{3})*(?:\.\d+)?\b/g) || [];
   for (const num of numbers) {
     const normalizedNum = num.replace(/,/g, "");
+    // Skip years (1900-2099)
+    if (/^(19|20)\d{2}$/.test(normalizedNum)) continue;
     if (!context.includes(normalizedNum) && !context.includes(num)) {
       return { valid: false, reason: `Response contains number "${num}" not found in context` };
     }
