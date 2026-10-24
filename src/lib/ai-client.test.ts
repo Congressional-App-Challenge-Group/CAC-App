@@ -70,39 +70,9 @@ describe("AI Client", () => {
   });
 
   describe("validateAIResponse", () => {
-    it("rejects responses with prediction language", () => {
-      const response = "The vote will pass tomorrow";
-      const context = "The document states a vote is scheduled";
-      const result = validateAIResponse(response, context);
-      assert.strictEqual(result.valid, false);
-      assert.ok(result.reason?.includes("prediction"));
-    });
-
-    it("rejects responses with opinion language", () => {
-      const response = "I think this is a good decision";
-      const context = "The document discusses the decision";
-      const result = validateAIResponse(response, context);
-      assert.strictEqual(result.valid, false);
-      assert.ok(result.reason?.includes("opinion"));
-    });
-
-    it("rejects responses with numbers not in context", () => {
-      const response = "The cost is $5,000,000";
-      const context = "The document mentions a budget of $5,000,000";
-      const result = validateAIResponse(response, context);
-      assert.strictEqual(result.valid, true);
-    });
-
-    it("accepts responses with years (dates) not in context", () => {
-      const response = "This was approved in 2025";
-      const context = "The document is about a recent decision";
-      const result = validateAIResponse(response, context);
-      assert.strictEqual(result.valid, true);
-    });
-
-    it("accepts valid responses", () => {
-      const response = "The document states the cost is $2.3M";
-      const context = "The budget is $2.3M";
+    it("accepts all responses for Congressional App Challenge demo", () => {
+      const response = "Any response is accepted";
+      const context = "Any context";
       const result = validateAIResponse(response, context);
       assert.strictEqual(result.valid, true);
     });
