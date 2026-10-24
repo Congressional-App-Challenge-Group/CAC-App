@@ -118,8 +118,24 @@ Analyze the patterns and provide historical context. Remember: this is about wha
     let jsonText = response.text;
     const jsonMatch = response.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      console.error("[Impact Analyzer] No JSON found in response");
-      return createFallbackAnalysis(request, similarDecisions, "No JSON in AI response");
+      console.error("[Impact Analyzer] No JSON found in response, using plain text fallback");
+      return {
+        decisionId: decision.id,
+        similarDecisions: similarDecisions.map((d) => ({
+          id: d.decision.id,
+          slug: d.decision.slug,
+          title: d.decision.title,
+          status: d.decision.status,
+          outcome: d.decision.status,
+          similarityReason: getSimilarityReason(d.similarityScore),
+        })),
+        patterns: [],
+        historicalContext: response.text || "No structured data available",
+        caveat: "This analysis is based on historical patterns from the verified record set. Past outcomes do not guarantee future results. CivicLens does not predict how this decision will be resolved.",
+        generatedAt: new Date().toISOString(),
+        model: response.model,
+        requiresApproval: true,
+      };
     }
 
     jsonText = jsonMatch[0];
@@ -151,7 +167,24 @@ Analyze the patterns and provide historical context. Remember: this is about wha
   } catch (error) {
     console.error("[Impact Analyzer] Failed to parse JSON:", error);
     console.error("[Impact Analyzer] Response text:", response.text);
-    return createFallbackAnalysis(request, similarDecisions, "Failed to parse AI response");
+    // Fallback: use the AI response as plain text for historical context
+    return {
+      decisionId: decision.id,
+      similarDecisions: similarDecisions.map((d) => ({
+        id: d.decision.id,
+        slug: d.decision.slug,
+        title: d.decision.title,
+        status: d.decision.status,
+        outcome: d.decision.status,
+        similarityReason: getSimilarityReason(d.similarityScore),
+      })),
+      patterns: [],
+      historicalContext: response.text || "AI response could not be parsed",
+      caveat: "This analysis is based on historical patterns from the verified record set. Past outcomes do not guarantee future results. CivicLens does not predict how this decision will be resolved.",
+      generatedAt: new Date().toISOString(),
+      model: response.model,
+      requiresApproval: true,
+    };
   }
 }
 

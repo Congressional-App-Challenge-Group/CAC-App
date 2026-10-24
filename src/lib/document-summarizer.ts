@@ -116,7 +116,23 @@ Extract the executive summary, key points, key figures, and key dates as specifi
   } catch (error) {
     console.error("[Document Summarizer] Failed to parse JSON:", error);
     console.error("[Document Summarizer] Response text:", response.text);
-    return createFallbackSummary(request, "Failed to parse AI response");
+
+    // Fallback: use the AI response as plain text for executive summary
+    return {
+      decisionId: decision.id,
+      sourceId: source.id,
+      keyPoints: [
+        `Document title: ${source.title}`,
+        `Organization: ${source.organization}`,
+        `Decision status: ${decision.status}`,
+      ],
+      keyFigures: [],
+      keyDates: [],
+      executiveSummary: response.text || "AI response could not be parsed",
+      generatedAt: new Date().toISOString(),
+      model: response.model,
+      requiresApproval: true,
+    };
   }
 }
 
