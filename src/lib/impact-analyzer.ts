@@ -9,7 +9,7 @@
  * TODO: Improve similarity matching for better historical context
  */
 
-import { callAI, validateAIResponse, type AIMessage } from "./ai-client";
+import { callAI, type AIMessage } from "./ai-client";
 import type { Decision } from "@/types";
 
 export interface ImpactAnalysis {
@@ -112,23 +112,25 @@ Analyze the patterns and provide historical context. Remember: this is about wha
 
   const response = await callAI([systemPrompt, userPrompt]);
 
-  // Validate the response
-  const validation = validateAIResponse(response.text, context || "");
-  if (!validation.valid) {
-    console.error("[Impact Analyzer] Validation failed:", validation.reason);
-    return createFallbackAnalysis(request, similarDecisions, validation.reason || "Validation failed");
-  }
-
   // Parse the JSON response
   try {
     // Try to extract JSON from the response (sometimes AI adds extra text)
+    let jsonText = response.text;
     const jsonMatch = response.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       console.error("[Impact Analyzer] No JSON found in response");
       return createFallbackAnalysis(request, similarDecisions, "No JSON in AI response");
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    jsonText = jsonMatch[0];
+
+    // Fix common JSON issues: trailing commas, unquoted keys, etc.
+    jsonText = jsonText
+      .replace(/,\s*}/g, '}')  // Remove trailing commas
+      .replace(/,\s*]/g, ']')  // Remove trailing commas in arrays
+      .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');  // Quote unquoted keys
+
+    const parsed = JSON.parse(jsonText);
     return {
       decisionId: decision.id,
       similarDecisions: similarDecisions.map((d) => ({

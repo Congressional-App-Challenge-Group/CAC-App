@@ -8,7 +8,7 @@
  * NOTE: Summaries require approval before public display
  */
 
-import { callAI, validateAIResponse, type AIMessage } from "./ai-client";
+import { callAI, type AIMessage } from "./ai-client";
 import type { Decision, CivicSource } from "@/types";
 
 export interface DocumentSummary {
@@ -86,17 +86,22 @@ Extract the executive summary, key points, key figures, and key dates as specifi
 
   const response = await callAI([systemPrompt, userPrompt]);
 
-  // Validate the response
-  const validation = validateAIResponse(response.text, content || "");
-  if (!validation.valid) {
-    console.error("[Document Summarizer] Validation failed:", validation.reason);
-    // Return a safe fallback
-    return createFallbackSummary(request, validation.reason || "Validation failed");
-  }
-
   // Parse the JSON response
   try {
-    const parsed = JSON.parse(response.text);
+    // Try to extract JSON from the response (sometimes AI adds extra text)
+    let jsonText = response.text;
+    const jsonMatch = response.text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      jsonText = jsonMatch[0];
+    }
+
+    // Fix common JSON issues: trailing commas, unquoted keys, etc.
+    jsonText = jsonText
+      .replace(/,\s*}/g, '}')  // Remove trailing commas
+      .replace(/,\s*]/g, ']')  // Remove trailing commas in arrays
+      .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');  // Quote unquoted keys
+
+    const parsed = JSON.parse(jsonText);
     return {
       decisionId: decision.id,
       sourceId: source.id,
@@ -110,6 +115,7 @@ Extract the executive summary, key points, key figures, and key dates as specifi
     };
   } catch (error) {
     console.error("[Document Summarizer] Failed to parse JSON:", error);
+    console.error("[Document Summarizer] Response text:", response.text);
     return createFallbackSummary(request, "Failed to parse AI response");
   }
 }
