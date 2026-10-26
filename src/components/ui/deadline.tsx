@@ -85,7 +85,7 @@ export function DeadlinePanel({ decision, now }: { decision: Decision; now?: Dat
           <Info size={16} aria-hidden="true" />
           No action date on the record
         </div>
-        <p className="mt-2 text-sm leading-6 text-ink-soft">
+        <p className="mt-2 text-sm leading-6 text-ink font-medium">
           This item is still open, but the official record states no date for its next action — so
           there is nothing to count down to. CivicLens does not estimate one.
         </p>
