@@ -1,8 +1,6 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { useSession } from "@/components/session-provider";
-import { createSupabaseBrowserClient } from "@/lib/supabase";
 import type { UserPreferences } from "@/types";
 
 const DEFAULTS: UserPreferences = {
@@ -26,7 +24,6 @@ type PreferencesContextValue = {
   followingPlaces: string[];
   toggleFollowPlace: (key: string) => void;
   ready: boolean;
-  source: "local" | "account";
   personalized: boolean;
   dismissPersonalization: () => void;
 };
@@ -51,123 +48,29 @@ function writeStorage(key: string, value: unknown) {
 }
 
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {
-  const { user, loading: sessionLoading, enabled } = useSession();
-  const userId = user?.id ?? null;
-  const profileKey = userId ?? "guest";
-
   const [preferences, setPreferenceState] = useState(DEFAULTS);
   const [following, setFollowing] = useState<string[]>([]);
   const [followingPlaces, setFollowingPlaces] = useState<string[]>([]);
-  const [loadedProfile, setLoadedProfile] = useState<string | null>(null);
-  const [source, setSource] = useState<"local" | "account">("local");
+  const [ready, setReady] = useState(false);
   const [personalized, setPersonalized] = useState(false);
 
-  const ready = !sessionLoading && loadedProfile === profileKey;
-
-  // Load local choices first. Signed-in users then get their saved cloud choices.
+  // Personalization is intentionally device-local: no account or network request is required.
   useEffect(() => {
-    if (sessionLoading) return;
+    setPreferenceState(readStorage<UserPreferences>(STORAGE.preferences) ?? DEFAULTS);
+    setFollowing(readStorage<string[]>(STORAGE.decisions) ?? []);
+    setFollowingPlaces(readStorage<string[]>(STORAGE.places) ?? []);
+    setPersonalized(readStorage<boolean>(STORAGE.personalized) === true);
+    setReady(true);
+  }, []);
 
-    let cancelled = false;
-    setLoadedProfile(null);
-
-    async function loadProfile() {
-      const localPreferences = readStorage<UserPreferences>(STORAGE.preferences);
-      const localFollowing = readStorage<string[]>(STORAGE.decisions) ?? [];
-      const localPlaces = readStorage<string[]>(STORAGE.places) ?? [];
-      const completed = readStorage<boolean>(STORAGE.personalized) === true;
-
-      if (!userId || !enabled) {
-        if (cancelled) return;
-        setPreferenceState(localPreferences ?? DEFAULTS);
-        setFollowing(localFollowing);
-        setFollowingPlaces(localPlaces);
-        setPersonalized(completed);
-        setSource("local");
-        setLoadedProfile("guest");
-        return;
-      }
-
-      const supabase = createSupabaseBrowserClient();
-      const [preferenceResult, decisionResult, placeResult] = await Promise.all([
-        supabase.from("user_preferences").select("*").eq("user_id", userId).maybeSingle(),
-        supabase.from("decision_follows").select("decision_id").eq("user_id", userId),
-        supabase.from("place_follows").select("place_key").eq("user_id", userId),
-      ]);
-
-      if (cancelled) return;
-
-      const row = preferenceResult.data;
-      if (row) {
-        setPreferenceState({
-          zipCode: row.zip_code || DEFAULTS.zipCode,
-          roles: row.roles ?? DEFAULTS.roles,
-          interests: row.interests ?? DEFAULTS.interests,
-        });
-        setPersonalized(true);
-        writeStorage(STORAGE.personalized, true);
-      } else {
-        setPreferenceState(localPreferences ?? DEFAULTS);
-        setPersonalized(completed);
-      }
-
-      setFollowing(
-        decisionResult.data?.map((item) => item.decision_id as string) ?? localFollowing,
-      );
-
-      const cloudPlaces = placeResult.data?.map((item) => item.place_key as string) ?? [];
-      setFollowingPlaces([...new Set([...cloudPlaces, ...localPlaces])]);
-      setSource("account");
-      setLoadedProfile(userId);
-    }
-
-    void loadProfile();
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled, profileKey, sessionLoading, userId]);
-
-  // Save every change locally. If signed in, also sync it to Supabase.
+  // Save every change locally after the initial browser-storage read completes.
   useEffect(() => {
     if (!ready) return;
 
     writeStorage(STORAGE.preferences, preferences);
     writeStorage(STORAGE.decisions, following);
     writeStorage(STORAGE.places, followingPlaces);
-
-    if (!userId || !enabled) return;
-
-    async function syncAccount() {
-      const supabase = createSupabaseBrowserClient();
-
-      await supabase.from("user_preferences").upsert(
-        {
-          user_id: userId,
-          zip_code: preferences.zipCode,
-          roles: preferences.roles,
-          interests: preferences.interests,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" },
-      );
-
-      await supabase.from("decision_follows").delete().eq("user_id", userId);
-      if (following.length) {
-        await supabase.from("decision_follows").insert(
-          following.map((decisionId) => ({ user_id: userId, decision_id: decisionId })),
-        );
-      }
-
-      await supabase.from("place_follows").delete().eq("user_id", userId);
-      if (followingPlaces.length) {
-        await supabase.from("place_follows").insert(
-          followingPlaces.map((placeKey) => ({ user_id: userId, place_key: placeKey })),
-        );
-      }
-    }
-
-    void syncAccount();
-  }, [enabled, following, followingPlaces, preferences, ready, userId]);
+  }, [following, followingPlaces, preferences, ready]);
 
   const setPreferences = useCallback((next: UserPreferences) => {
     setPreferenceState(next);
@@ -202,7 +105,6 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         followingPlaces,
         toggleFollowPlace,
         ready,
-        source,
         personalized,
         dismissPersonalization,
       }}

@@ -8,7 +8,6 @@ import { PreferencesProvider } from "@/features/preferences/preferences";
 import { PlaceProvider } from "@/features/place/place";
 import { PwaRegister } from "@/components/pwa-register";
 import { DecisionsProvider } from "@/components/decisions-provider";
-import { SessionProvider } from "@/components/session-provider";
 import { PageMotion } from "@/components/ui/reveal";
 import { getDecisions } from "@/server/decisions";
 import { FirstVisitPersonalization } from "@/features/preferences/first-visit-personalization";
@@ -62,10 +61,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
-        <SessionProvider>
-          <DecisionsProvider decisions={decisions}>
-            <PreferencesProvider>
-              <PlaceProvider>
+        <DecisionsProvider decisions={decisions}>
+          <PreferencesProvider>
+            <PlaceProvider>
                 <PwaRegister />
                 <a
                   href="#main"
@@ -78,10 +76,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <main id="main">{children}</main>
                 <Footer />
                 <FirstVisitPersonalization />
-              </PlaceProvider>
-            </PreferencesProvider>
-          </DecisionsProvider>
-        </SessionProvider>
+            </PlaceProvider>
+          </PreferencesProvider>
+        </DecisionsProvider>
         {isVercelDeployment ? <Analytics /> : null}
       </body>
     </html>

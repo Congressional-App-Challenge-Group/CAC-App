@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Clock, Compass, Heart, Home, LogIn, MapPin, UserRound } from "lucide-react";
+import { Activity, Clock, Compass, Heart, Home, MapPin, SlidersHorizontal } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { usePreferences } from "@/features/preferences/preferences";
-import { useSession } from "@/components/session-provider";
 import { cn } from "@/lib/cn";
 
 const desktopLinks = [
@@ -26,8 +24,6 @@ const mobileLinks = desktopLinks.filter((link) =>
 
 export function Header() {
   const path = usePathname();
-  const { preferences, ready } = usePreferences();
-  const { user } = useSession();
 
   return (
     <>
@@ -63,25 +59,15 @@ export function Header() {
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            {user ? (
-              <Link
-                href="/settings"
-                title="Your CivicLens account"
-                aria-label="Your CivicLens account"
-                className="settings-pill flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-extrabold shadow-sm transition-colors hover:bg-surface-2"
-              >
-                <UserRound size={15} />
-                <span className="hidden sm:inline">{ready ? preferences.zipCode : "Account"}</span>
-              </Link>
-            ) : (
-              <Link
-                href="/login"
-                className="settings-pill flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-extrabold shadow-sm transition-colors hover:bg-surface-2"
-              >
-                <LogIn size={15} />
-                <span className="hidden sm:inline">Sign in</span>
-              </Link>
-            )}
+            <Link
+              href="/settings"
+              title="Personalization settings"
+              aria-label="Personalization settings"
+              className="settings-pill flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-extrabold shadow-sm transition-colors hover:bg-surface-2"
+            >
+              <SlidersHorizontal size={15} />
+              <span className="hidden sm:inline">Settings</span>
+            </Link>
           </div>
         </div>
       </header>
