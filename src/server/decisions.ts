@@ -466,9 +466,7 @@ export async function getObservatoryStory(): Promise<ObservatoryStory | null> {
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const storyTimeline = verifiedTimeline;
   const latestRecordedEvent = [...verifiedTimeline].reverse().find((event) => event.title !== "First tracked appearance");
-  const currentStoryDate = featured.deadline?.date && featured.deadline.date >= new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date()) ? featured.deadline.date : undefined;
+  const currentStoryDate = featured.deadline?.date || undefined;
   const storySource = latestRecordedEvent?.sourceId
     ? featured.sources.find((entry) => entry.id === latestRecordedEvent.sourceId) ?? source
     : source;
@@ -479,13 +477,9 @@ export async function getObservatoryStory(): Promise<ObservatoryStory | null> {
     .slice(0, 3)
     .map(({ slug, title, organization, status }) => ({ slug, title, organization, status }));
 
-  const today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date());
   const deadlines = all
     .filter((decision) =>
       decision.deadline?.date &&
-      decision.deadline.date >= today &&
       decision.sources.some((entry) => entry.verificationStatus === "verified" && Boolean(entry.url)),
     )
     .sort((a, b) => (a.deadline?.date ?? "").localeCompare(b.deadline?.date ?? ""))
